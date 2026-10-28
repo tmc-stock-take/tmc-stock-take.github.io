@@ -6,14 +6,14 @@
   <meta name="theme-color" content="#102642">
   <meta name="description" content="TMC Warehouse Stock Take — ERP import, QR scan and reconciliation, offline ready.">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="icon" type="image/svg+xml" href="icon.svg">
-  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="icon" type="image/png" sizes="64x64" href="favicon-64.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
   <title>TMC Stock Take | Warehouse Inventory</title>
   <style>
     :root{font-family:Inter,"Segoe UI","Microsoft YaHei",Arial,sans-serif;color:#14263b;background:#f3f6fa;font-synthesis:none}
     *{box-sizing:border-box} body{margin:0} button,input,select{font:inherit} button{cursor:pointer}
     .topbar{background:#122b47;color:#fff;min-height:75px;padding:12px max(18px,calc((100vw - 1320px)/2));display:flex;gap:15px;align-items:center;justify-content:space-between}
-    .brand{display:flex;align-items:center;gap:13px;min-width:0}.brand img{width:48px;height:48px;background:#fff;border-radius:12px;padding:3px}
+    .brand{display:flex;align-items:center;gap:13px;min-width:0}.brand img{width:48px;height:48px;background:#fff;border-radius:12px;padding:0;object-fit:cover}
     .brand strong{display:block;letter-spacing:.02em;font-size:19px}.brand small{display:block;color:#aec3d7;margin-top:3px;font-size:12px}
     .toplinks{display:flex;align-items:center;gap:10px}.version{color:#b7c8dc;font-size:12px;white-space:nowrap}
     .wrap{max-width:1360px;padding:24px 18px 60px;margin:auto}.headrow{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap}
@@ -64,7 +64,7 @@
   </style>
 </head>
 <body>
-<header class="topbar"><div class="brand"><img src="icon.svg" alt="TMC Stock Take"><div><strong>TMC STOCK TAKE</strong><small>Three-Way Stock Take · V1.1</small></div></div><div class="toplinks"><span class="version">LOCAL DATA · GITHUB PAGES READY</span><button class="btn small-btn" id="installBtn" hidden>⬇ 安装 App</button></div></header>
+<header class="topbar"><div class="brand"><img src="icon-192.png" alt="TMC Stock Take"><div><strong>TMC STOCK TAKE</strong><small>Three-Way Stock Take · V1.1.1</small></div></div><div class="toplinks"><span class="version">LOCAL DATA · GITHUB PAGES READY</span><button class="btn small-btn" id="installBtn" hidden>⬇ 安装 App</button></div></header>
 <main class="wrap">
  <div class="headrow"><div><h1>仓库库存盘点 <span class="muted">/ Stock Take</span></h1><div class="muted">导入 ERP 报表 → 设置实际盘点位置 → 扫描标签 QR → 三方自动比对</div></div><div class="buttons"><button id="exportExcel" class="btn green">↓ 导出 Excel</button><button id="exportCsv" class="btn">↓ 导出 CSV</button><button id="resetAll" class="btn danger">清空盘点</button></div></div>
  <section class="metrics" aria-label="盘点总览">
@@ -104,7 +104,7 @@
  </section>
  <section class="card tablesection"><div class="section-head"><div><h2>④ ERP 盘点比对 / Inventory Reconciliation</h2><p class="muted">按项目显示 ERP 数量、已扫描重量及差异</p></div><div class="buttons"><button id="showDiscrepancy" class="btn small-btn">只看差异</button><button id="showAllRows" class="btn small-btn">显示全部</button></div></div><div class="filters"><input id="searchInventory" type="text" placeholder="搜索料号 / 批号 / 储位 / 品名"><select id="statusFilter" aria-label="状态筛选"><option value="all">全部状态</option><option value="done">已完成</option><option value="pending">待盘点</option><option value="short">数量不足</option><option value="over">数量超出</option></select><span id="tableSummary" class="muted">0 项记录</span></div><div class="scrolltable"><table class="data-table"><thead><tr><th>状态</th><th>料号 Part No.</th><th>品名 Description</th><th>规格</th><th>仓库</th><th>储位</th><th>批号</th><th class="num">ERP 数量</th><th class="num">扫描重量</th><th class="num">差异 (实-账)</th><th>标签数</th></tr></thead><tbody id="inventoryBody"><tr><td colspan="11" class="blank">请先导入报表</td></tr></tbody></table></div></section>
  <section class="card tablesection"><div class="section-head"><div><h2>⑤ 扫描记录 / Scan History</h2><p class="muted">保存每个标签编号、重量、时间与异常原因</p></div><button id="clearScans" class="btn danger small-btn">清空扫描记录</button></div><div class="filters"><select id="historyFilter" aria-label="扫描记录筛选"><option value="all">全部扫描</option><option value="accepted">有效扫描</option><option value="exception">异常 / 重复</option></select><span id="historySummary" class="muted">0 笔记录</span></div><div class="scrolltable"><table class="data-table"><thead><tr><th>扫描时间</th><th>结果</th><th>Label No.</th><th>料号</th><th>标签仓库</th><th>标签储位</th><th>实际仓库</th><th>实际储位</th><th>ERP 仓库</th><th>ERP 储位</th><th>批号</th><th class="num">净重 KG</th><th>差异 / 备注</th><th>操作</th></tr></thead><tbody id="historyBody"><tr><td colspan="14" class="blank">暂无扫描记录</td></tr></tbody></table></div></section>
- <div class="foot">TMC Stock Take V1.1 · 本机浏览器储存（IndexedDB）· 不上传仓库数据到服务器 · 请定期导出 Excel 备份<br>若更换手机或清除浏览器网站数据，原盘点记录可能会丢失。</div>
+ <div class="foot">TMC Stock Take V1.1.1 · 本机浏览器储存（IndexedDB）· 不上传仓库数据到服务器 · 请定期导出 Excel 备份<br>若更换手机或清除浏览器网站数据，原盘点记录可能会丢失。</div>
 </main><div id="toast" class="toast" role="alert"></div>
 <script src="vendor/jszip.min.js"></script><script src="app.js" defer></script>
 </body></html>

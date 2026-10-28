@@ -1,3 +1,25 @@
+# TMC Warehouse Stock Take V1.1.1 — 已换成你选的蓝色扫码图标
+
+这是 **V1.1 盘点系统的图标更新版**。保留 ERP 导入、QR 扫描、实际仓库/储位三方比对、盘点记录及导出功能；本次只更新 App/浏览器图标和静态资源版本。
+
+## GitHub Pages 更新方式（无需新建 Repository）
+
+1. 将本 ZIP **解压**，打开你现有的 `tmc-stock-take.github.io` Repository 的 **Code** 页面。
+2. 选择 `Add file → Upload files`，上传解压后的所有文件及 `vendor` 文件夹，覆盖现有文件。
+3. 点击 `Commit changes`。GitHub Pages 会从 `main / (root)` 重新部署。
+4. 在网站按 `Ctrl+F5` 或重新打开网页。若 Android 主屏幕图标仍是旧图标，可先移除旧的主屏幕快捷方式，再从 Chrome 重新安装；**请不要清除网站数据或重置盘点资料**。
+5. 网站的实际网址请以 GitHub `Settings → Pages` 显示的 **Your site is live at** 为准。
+
+## 图标文件
+
+- `icon-192.png`、`icon-512.png`：Android / PWA App 图标。
+- `icon-maskable-512.png`：适配 Android 自适应图标。
+- `apple-touch-icon.png`：iPhone 主屏幕图标。
+- `favicon-64.png`：浏览器标签页图标。
+- `icon.svg`：为兼容旧文件引用，同时更新为同款图标。
+
+---
+
 # TMC Warehouse Stock Take V1.1 — 三方盘点系统
 
 本版本是独立的本地存储网页 App，可直接上传至 GitHub Pages（不影响原有 `tmc-qr-scanner` 项目）。
