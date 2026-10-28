@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#102642">
+  <meta name="description" content="TMC Warehouse Stock Take — ERP import, QR scan and reconciliation, offline ready.">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <title>TMC Stock Take | Warehouse Inventory</title>
+  <style>
+    :root{font-family:Inter,"Segoe UI","Microsoft YaHei",Arial,sans-serif;color:#14263b;background:#f3f6fa;font-synthesis:none}
+    *{box-sizing:border-box} body{margin:0} button,input,select{font:inherit} button{cursor:pointer}
+    .topbar{background:#122b47;color:#fff;min-height:75px;padding:12px max(18px,calc((100vw - 1320px)/2));display:flex;gap:15px;align-items:center;justify-content:space-between}
+    .brand{display:flex;align-items:center;gap:13px;min-width:0}.brand img{width:48px;height:48px;background:#fff;border-radius:12px;padding:3px}
+    .brand strong{display:block;letter-spacing:.02em;font-size:19px}.brand small{display:block;color:#aec3d7;margin-top:3px;font-size:12px}
+    .toplinks{display:flex;align-items:center;gap:10px}.version{color:#b7c8dc;font-size:12px;white-space:nowrap}
+    .wrap{max-width:1360px;padding:24px 18px 60px;margin:auto}.headrow{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap}
+    h1{font-size:26px;letter-spacing:-.6px;margin:0 0 6px} h2{font-size:18px;margin:0} h3{font-size:15px;margin:0}
+    .muted{color:#617286;font-size:13px}.small{font-size:12px}.btn{border:1px solid #d2dce8;background:white;padding:10px 15px;border-radius:9px;color:#253f59;font-weight:650;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:40px}
+    .btn:hover{background:#f3f7fb}.btn.primary{border-color:#166bba;background:#186fbb;color:white}.btn.primary:hover{background:#115f9e}.btn.green{border-color:#0b8b77;background:#078574;color:white}.btn.danger{color:#b62737;border-color:#f1c5cb}.btn.small-btn{padding:6px 9px;min-height:30px;font-size:12px}.btn:disabled{opacity:.48;cursor:default}
+    .buttons{display:flex;flex-wrap:wrap;gap:8px}.card{border:1px solid #e0e7f0;background:#fff;border-radius:15px;box-shadow:0 3px 12px #213f5b08;padding:20px;min-width:0}
+    .metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:13px;margin-bottom:16px}.metric-label{font-size:12px;color:#60738a;white-space:nowrap}.metric-value{font-size:29px;line-height:1.3;font-weight:760;margin-top:7px;letter-spacing:-1px}
+    .metric-note{font-size:11px;margin-top:3px;color:#76869a}.green-text{color:#138875}.red-text{color:#c54548}.amber-text{color:#b97812}
+    .main-grid{display:grid;grid-template-columns:minmax(340px,1.03fr) minmax(320px,.97fr);gap:15px;align-items:start;margin-bottom:16px}.section-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:15px}
+    .section-head .muted{margin:4px 0 0}.field-label{display:block;font-size:13px;color:#53667c;font-weight:650;margin:11px 0 6px}
+    .filebox{border:2px dashed #b8cde2;background:#f6faff;border-radius:12px;padding:19px;text-align:center;display:flex;flex-direction:column;gap:7px;align-items:center}
+    .filebox strong{font-size:14px}.filebox .muted{line-height:1.6}.filebox input{max-width:100%;width:100%;font-size:13px}
+    .reportinfo{display:flex;gap:10px;justify-content:space-between;align-items:center;background:#f3f8fc;padding:11px 13px;border-radius:9px;margin-top:12px;flex-wrap:wrap}
+    .progress{height:8px;background:#e4edf5;border-radius:10px;overflow:hidden;margin:14px 0 5px}.progress>div{background:linear-gradient(90deg,#0d9d8e,#20bf9d);height:100%;width:0%;transition:width .25s}
+    .scanner{background:#0d223a;border-radius:12px;overflow:hidden;min-height:156px;position:relative;color:#b6d7e7;display:flex;align-items:center;justify-content:center;text-align:center}
+    video{display:none;width:100%;height:230px;object-fit:cover;background:#0c2339}.scanlines{position:absolute;left:20%;right:20%;top:20%;bottom:20%;border:2px solid #3ad4b4;border-radius:8px;pointer-events:none;display:none}.scanlines::before,.scanlines::after{content:"";height:2px;background:#3ad4b4;position:absolute;left:0;right:0;top:50%;box-shadow:0 0 15px #3ad4b4}
+    .scan-hint{display:flex;flex-direction:column;align-items:center;gap:5px;padding:24px}.scan-hint span{font-size:36px}.scanner.active video,.scanner.active .scanlines{display:block}.scanner.active .scan-hint{display:none}
+    .input-row{display:flex;gap:8px}.input-row input{flex:1;min-width:0}
+    input[type=text],input[type=number],select{border:1px solid #ccd8e5;border-radius:9px;background:#fff;color:#1c3551;padding:10px 11px;width:100%;outline:none;min-height:41px}
+    input:focus,select:focus{border-color:#368fcf;box-shadow:0 0 0 3px #348ccf18}
+    .statusbox{min-height:65px;background:#f2f6fa;border:1px solid #e4ebf2;border-radius:10px;padding:12px 14px;margin-top:12px;font-size:13px;line-height:1.6}
+    .statusbox.good{background:#eaf9f4;border-color:#afe4d4}.statusbox.warn{background:#fff7e9;border-color:#f5d7a1}.statusbox.bad{background:#fff0f1;border-color:#f2c2ca}
+    .statusbox strong{display:block;font-size:14px}.tip{border-left:3px solid #3891cc;background:#f3f9fe;padding:9px 12px;margin-top:12px;color:#47637e;border-radius:0 8px 8px 0;font-size:12px;line-height:1.65}
+    .tablesection{margin-top:16px}.filters{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:13px}.filters input{width:240px;max-width:100%}.filters select{width:auto;max-width:100%}
+    .scrolltable{width:100%;overflow:auto;border:1px solid #e4eaf0;border-radius:10px}.data-table{width:100%;border-collapse:collapse;white-space:nowrap;font-size:12px;text-align:left}.data-table th{background:#f4f7fb;color:#526880;font-weight:750;border-bottom:1px solid #e0e7ef;padding:11px 10px;position:sticky;top:0}.data-table td{border-bottom:1px solid #ecf0f5;padding:9px 10px;vertical-align:middle}.data-table tr:last-child td{border-bottom:0}.data-table tr:hover td{background:#f7fbff}.data-table .namecol{max-width:240px;white-space:normal;min-width:165px}.data-table .num{text-align:right;font-variant-numeric:tabular-nums}
+    .pill{display:inline-flex;padding:4px 8px;border-radius:20px;font-size:11px;font-weight:750;white-space:nowrap}.pill.ok{color:#087a64;background:#def5ee}.pill.wait{color:#64748a;background:#ebeff4}.pill.short{color:#92601a;background:#fff2d8}.pill.over,.pill.bad{color:#b23143;background:#ffe9ee}
+    .blank{padding:36px;text-align:center;color:#7e8c9b;font-size:13px}.notice{font-size:12px;color:#7b899c;line-height:1.6}
+    .mapping{display:none;margin-top:15px;border:1px solid #d7e4f1;background:#f8fbfe;border-radius:11px;padding:15px}.mapping.show{display:block}
+    .map-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:14px;row-gap:7px}.map-grid .field-label{margin-top:8px}
+    .map-row{display:flex;flex-direction:column}.map-row select{font-size:12px}.mapping-preview{margin:12px 0;font-size:12px;color:#4f647b}
+    .fullwidth{width:100%}.foot{font-size:12px;color:#7d8999;text-align:center;margin-top:18px}.hide{display:none!important}
+    .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#1a3752;color:white;padding:11px 20px;border-radius:9px;font-size:13px;z-index:10;box-shadow:0 12px 25px #08172655;max-width:95vw;text-align:center;display:none}
+    @media(max-width:1050px){.metrics{grid-template-columns:repeat(3,minmax(0,1fr))}.main-grid{grid-template-columns:1fr}}
+    @media(max-width:600px){.wrap{padding:14px 10px 50px}.topbar{padding:12px}.brand strong{font-size:16px}.brand small{font-size:11px}.version{display:none}.headrow{gap:6px}h1{font-size:21px}.card{padding:15px;border-radius:12px}.metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.metrics .card{padding:13px}.metric-value{font-size:25px}.metric-label{font-size:11px}.main-grid{gap:10px}.map-grid{grid-template-columns:1fr}.buttons{gap:6px}.buttons .btn{font-size:12px;padding:8px 10px}.input-row{flex-wrap:wrap}.input-row input{flex-basis:100%}.input-row .btn{flex:1}.filters input{width:100%}.section-head h2{font-size:17px}}
+
+    .actual-position{margin-top:18px;margin-bottom:0;border-color:#b9d4ee;background:linear-gradient(110deg,#fff 70%,#f5faff);padding:14px}
+    .position-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end}.position-actions{grid-column:1/-1}
+    .position-grid .field-label{margin-top:0}
+    .position-notice{padding:11px 12px;margin-top:12px;background:#edf5fd;color:#315c83;border-radius:10px;font-size:13px;line-height:1.55}
+    .position-notice.active{background:#e8f9f3;color:#0b7b64}.position-notice.dirty{background:#fff4dd;color:#966019}
+    .comparison-panel{margin-top:12px;border:1px solid #d8e3ed;border-radius:11px;padding:12px;background:#fafcfe}
+    .comparison-title{font-weight:750;font-size:13px;margin-bottom:8px}.comparison-panel .data-table{font-size:12px}.comparison-panel .data-table th{position:static}
+    .comparison-panel .data-table td,.comparison-panel .data-table th{padding:9px}.comparison-panel td.diff-cell{color:#b52b3e;background:#fff0f2;font-weight:750}
+    .comparison-panel .comparison-detail{margin-top:8px;font-size:12px;line-height:1.6;color:#526880}
+    @media(max-width:650px){.position-grid{grid-template-columns:1fr 1fr;gap:10px}.actual-position .section-head{margin-bottom:12px}}
+    @media(max-width:380px){.position-grid{grid-template-columns:1fr}.position-actions{grid-column:auto}}
+  </style>
+</head>
+<body>
+<header class="topbar"><div class="brand"><img src="icon.svg" alt="TMC Stock Take"><div><strong>TMC STOCK TAKE</strong><small>Three-Way Stock Take · V1.1</small></div></div><div class="toplinks"><span class="version">LOCAL DATA · GITHUB PAGES READY</span><button class="btn small-btn" id="installBtn" hidden>⬇ 安装 App</button></div></header>
+<main class="wrap">
+ <div class="headrow"><div><h1>仓库库存盘点 <span class="muted">/ Stock Take</span></h1><div class="muted">导入 ERP 报表 → 设置实际盘点位置 → 扫描标签 QR → 三方自动比对</div></div><div class="buttons"><button id="exportExcel" class="btn green">↓ 导出 Excel</button><button id="exportCsv" class="btn">↓ 导出 CSV</button><button id="resetAll" class="btn danger">清空盘点</button></div></div>
+ <section class="metrics" aria-label="盘点总览">
+  <div class="card"><div class="metric-label">ERP 库存项目</div><div id="countTotal" class="metric-value">0</div><div class="metric-note">Unique inventory lines</div></div>
+  <div class="card"><div class="metric-label">已完成盘点</div><div id="countDone" class="metric-value green-text">0</div><div class="metric-note">Matched quantity</div></div>
+  <div class="card"><div class="metric-label">待盘点 / 数量不足</div><div id="countPending" class="metric-value amber-text">0</div><div class="metric-note">Not yet fully counted</div></div>
+  <div class="card"><div class="metric-label">异常 / 数量超出</div><div id="countIssues" class="metric-value red-text">0</div><div class="metric-note">Location mismatches + overstock items</div></div>
+  <div class="card"><div class="metric-label">三方匹配标签</div><div id="countScans" class="metric-value">0</div><div class="metric-note">Triple-matched · No duplicated weight</div></div>
+ </section>
+ <section class="main-grid">
+  <div class="card">
+   <div class="section-head"><div><h2>① 导入 ERP 库存报表</h2><p class="muted">Import ERP Inventory Report</p></div><button id="demoBtn" class="btn small-btn">载入图片示例</button></div>
+   <div class="filebox"><strong>选择 ERP Excel (.xlsx) 或 CSV 报表</strong><span class="muted">支持料件編號、品名、規格、倉庫編號、儲位、批號、庫存數量、庫存單位</span><input id="reportFile" type="file" accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></div>
+   <div id="mappingPanel" class="mapping"><h3>确认报表栏位对应 / Column Mapping</h3><p id="mappingInfo" class="muted">自动辨识后可以自行调整</p><div id="mappingFields" class="map-grid"></div><div id="mappingPreview" class="mapping-preview"></div><div class="buttons"><button id="confirmImport" class="btn primary">确认导入报表</button><button id="cancelImport" class="btn">取消</button></div></div>
+   <div id="reportInfo" class="reportinfo"><span class="muted">尚未导入报表</span></div>
+   <div class="progress"><div id="progressFill"></div></div><div id="progressLabel" class="muted small">完成率 0%</div>
+   <div class="tip">先匹配「料号 + 批号」，再将 ERP、QR 标签和实际盘点仓库 / 储位三方核对。只有三方一致的标签会累计重量；无法唯一确认 ERP 项目时会显示异常，不会随意分配给某个储位。</div>
+ <section class="card actual-position" aria-label="实盘位置">
+   <div class="section-head"><div><h2>② 设置实际盘点位置 <span class="muted">/ Actual Stock Location</span></h2><p class="muted">先确认目前站在哪个仓库和货架，再连续扫描该位置的物料标签</p></div><div id="activePositionBadge" class="pill wait">尚未设置</div></div>
+   <div class="position-grid">
+    <div><label class="field-label" for="actualWarehouse">实际仓库 / Actual Warehouse *</label><input type="text" id="actualWarehouse" list="warehouseOptions" autocomplete="off" autocapitalize="characters" placeholder="例如 L002"><datalist id="warehouseOptions"></datalist></div>
+    <div><label class="field-label" for="actualLocation">实际储位 / Actual Racking No. *</label><input type="text" id="actualLocation" autocomplete="off" autocapitalize="characters" placeholder="例如 3A1-113"></div>
+    <div class="position-actions"><button id="confirmPosition" class="btn primary fullwidth">✓ 确认当前盘点位置</button></div>
+   </div>
+   <div id="positionNotice" class="position-notice">未确认实际位置之前，无法扫描标签。确认后会持续沿用，直到你更换储位。</div>
+   <div class="tip">比对三个来源：<b>ERP 报表位置</b>、<b>标签 QR 位置</b>、<b>仓库人员确认的实际位置</b>。三方全部相符才计算有效盘点重量。任何位置不一致都会存入异常记录，不会自动修改 ERP 库存。</div>
+ </section>
+  </div>
+  <div class="card">
+   <div class="section-head"><div><h2>③ 扫描实物 QR 标签</h2><p class="muted">Check ERP × QR × Actual Location</p></div><button id="cameraBtn" class="btn primary">开启相机扫描</button></div>
+   <div id="scannerPanel" class="scanner"><div class="scan-hint"><span>▦</span><strong>等待扫描 QR Code</strong><small>手机相机、扫描枪、手动输入或上传标签照片</small></div><video id="cameraVideo" playsinline autoplay muted></video><div class="scanlines"></div></div>
+   <label class="field-label" for="scanInput">手动输入 / 2D Scanner Input</label><div class="input-row"><input id="scanInput" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="NO.009998|L002|3A1-113|20260617|..."><button id="scanBtn" class="btn green">确认扫描</button></div>
+   <div class="buttons" style="margin-top:9px"><label class="btn" for="photoInput">从照片读取 QR</label><input id="photoInput" type="file" accept="image/*" style="display:none"><button id="demoScanBtn" class="btn">试扫示例标签</button><button id="undoBtn" class="btn danger">撤销上一笔</button></div>
+   <div id="scanStatus" class="statusbox" role="status"><strong>准备就绪</strong>请先导入 ERP 报表，并确认实际盘点位置。</div><div id="scanComparison" class="comparison-panel hide" aria-live="polite"></div>
+   <div class="tip">示例 QR：<code>NO.009998|L002|3A1-113|20260617|5899951013108|190.300</code>。相机需要 HTTPS（例如 GitHub Pages）或 localhost；若浏览器不支持 QR 相机识别，可以使用 2D 扫描枪或手动输入。</div>
+  </div>
+ </section>
+ <section class="card tablesection"><div class="section-head"><div><h2>④ ERP 盘点比对 / Inventory Reconciliation</h2><p class="muted">按项目显示 ERP 数量、已扫描重量及差异</p></div><div class="buttons"><button id="showDiscrepancy" class="btn small-btn">只看差异</button><button id="showAllRows" class="btn small-btn">显示全部</button></div></div><div class="filters"><input id="searchInventory" type="text" placeholder="搜索料号 / 批号 / 储位 / 品名"><select id="statusFilter" aria-label="状态筛选"><option value="all">全部状态</option><option value="done">已完成</option><option value="pending">待盘点</option><option value="short">数量不足</option><option value="over">数量超出</option></select><span id="tableSummary" class="muted">0 项记录</span></div><div class="scrolltable"><table class="data-table"><thead><tr><th>状态</th><th>料号 Part No.</th><th>品名 Description</th><th>规格</th><th>仓库</th><th>储位</th><th>批号</th><th class="num">ERP 数量</th><th class="num">扫描重量</th><th class="num">差异 (实-账)</th><th>标签数</th></tr></thead><tbody id="inventoryBody"><tr><td colspan="11" class="blank">请先导入报表</td></tr></tbody></table></div></section>
+ <section class="card tablesection"><div class="section-head"><div><h2>⑤ 扫描记录 / Scan History</h2><p class="muted">保存每个标签编号、重量、时间与异常原因</p></div><button id="clearScans" class="btn danger small-btn">清空扫描记录</button></div><div class="filters"><select id="historyFilter" aria-label="扫描记录筛选"><option value="all">全部扫描</option><option value="accepted">有效扫描</option><option value="exception">异常 / 重复</option></select><span id="historySummary" class="muted">0 笔记录</span></div><div class="scrolltable"><table class="data-table"><thead><tr><th>扫描时间</th><th>结果</th><th>Label No.</th><th>料号</th><th>标签仓库</th><th>标签储位</th><th>实际仓库</th><th>实际储位</th><th>ERP 仓库</th><th>ERP 储位</th><th>批号</th><th class="num">净重 KG</th><th>差异 / 备注</th><th>操作</th></tr></thead><tbody id="historyBody"><tr><td colspan="14" class="blank">暂无扫描记录</td></tr></tbody></table></div></section>
+ <div class="foot">TMC Stock Take V1.1 · 本机浏览器储存（IndexedDB）· 不上传仓库数据到服务器 · 请定期导出 Excel 备份<br>若更换手机或清除浏览器网站数据，原盘点记录可能会丢失。</div>
+</main><div id="toast" class="toast" role="alert"></div>
+<script src="vendor/jszip.min.js"></script><script src="app.js" defer></script>
+</body></html>
