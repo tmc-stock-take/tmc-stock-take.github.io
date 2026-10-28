@@ -1,4 +1,4 @@
-/* TMC Stock Take V1.1 - ERP x QR label x actual physical warehouse/racking reconciliation */
+/* TMC Stock Take V1.2 bilingual - ERP x QR label x actual physical warehouse/racking reconciliation */
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);
@@ -42,7 +42,8 @@ function now(){return new Date().toLocaleString('zh-MY',{hour12:false})}
 function stamp(){const d=new Date();return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'_'+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0')}
 function msg(message){let el=$('toast');el.textContent=message;el.style.display='block';clearTimeout(msg.t);msg.t=setTimeout(()=>el.style.display='none',3800)}
 function notice(title,detail,level=''){const el=$('scanStatus');el.className='statusbox '+level;el.innerHTML='<strong>'+safe(title)+'</strong>'+safe(detail)}
-function withConfirm(message){return window.confirm(message)}
+function withConfirm(message){return window.confirm(tr(message))}
+function tr(value){return window.StockTakeI18n?.translate(value)??String(value??'')}
 async function openDb(){return new Promise(resolve=>{
  if(!('indexedDB'in window)){resolve(null);return}
  let request;try{request=indexedDB.open('tmc_stock_take_v1',1)}catch(e){resolve(null);return}
@@ -228,7 +229,7 @@ function renderComparison(record){
   const valid=erp!=='未确认';
   return '<tr><td>'+safe(title)+'</td><td class="'+(valid&&erp!==label?'diff-cell':'')+'">'+safe(erp)+'</td><td class="'+(valid&&label!==erp?'diff-cell':'')+'">'+safe(label)+'</td><td class="'+((valid&&actual!==erp)||actual!==label?'diff-cell':'')+'">'+safe(actual)+'</td></tr>';
  }).join('');
- el.innerHTML='<div class="comparison-title">ERP × QR 标签 × 实际位置</div><div class="scrolltable"><table class="data-table"><thead><tr><th>比对字段</th><th>ERP 系统</th><th>QR 标签</th><th>实际位置</th></tr></thead><tbody>'+result+'</tbody></table></div><div class="comparison-detail">'+safe(record.message||'')+' · Label '+safe(record.label||'—')+' · '+safe(record.part||'—')+' / '+safe(record.lot||'—')+'</div>';
+ el.innerHTML='<div class="comparison-title">ERP × QR 标签 × 实际位置</div><div class="scrolltable"><table class="data-table"><thead><tr><th>比对字段</th><th>ERP 系统</th><th>QR 标签</th><th>实际位置</th></tr></thead><tbody>'+result+'</tbody></table></div><div class="comparison-detail">'+safe(tr(record.message||''))+' · Label '+safe(record.label||'—')+' · '+safe(record.part||'—')+' / '+safe(record.lot||'—')+'</div>';
  el.classList.remove('hide');
 }
 function scannedSum(){let map=new Map();for(let h of state.history){if(h.status!=='accepted')continue;let k=keyOf(h);map.set(k,{sum:round3((map.get(k)?.sum||0)+h.weight),count:(map.get(k)?.count||0)+1})}return map}
@@ -261,7 +262,7 @@ async function performScan(raw){
  else if(record.status==='ambiguous')notice('⚠ ERP 储位不明确',record.message+'。请人工核对，不计入有效盘点。','bad');
  else notice('⚠ ERP 无匹配记录',record.message+'。已记录实际位置，不计入有效盘点。','bad');
 }
-function statusInfo(k){return {done:['完成','ok'],pending:['未盘点','wait'],short:['数量不足','short'],over:['超出','over'],accepted:['MATCH','ok'],duplicate:['重复','short'],unmatched:['ERP无记录','bad'],invalid:['QR错误','bad'],mismatch:['位置不符','bad'],ambiguous:['ERP多位置','bad'],legacy:['旧版待复盘','wait']}[k]||['异常','bad']}
+function statusInfo(k){let st={done:['完成','ok'],pending:['未盘点','wait'],short:['数量不足','short'],over:['超出','over'],accepted:['MATCH','ok'],duplicate:['重复','short'],unmatched:['ERP无记录','bad'],invalid:['QR错误','bad'],mismatch:['位置不符','bad'],ambiguous:['ERP多位置','bad'],legacy:['旧版待复盘','wait']}[k]||['异常','bad'];return [tr(st[0]),st[1]]}
 function pill(k){let [label,cl]=statusInfo(k);return '<span class="pill '+cl+'">'+label+'</span>'}
 function render(){const sums=scannedSum(),total=state.inventory.length,items=state.inventory.map(r=>{const s=sums.get(keyOf(r))||{sum:0,count:0};return {...r,scanned:s.sum,count:s.count,difference:round3(s.sum-r.quantity),status:classify(r,s.sum)}});
  let done=items.filter(x=>x.status==='done').length,over=items.filter(x=>x.status==='over').length,exceptions=state.history.filter(h=>h.status!=='accepted').length;
@@ -269,14 +270,14 @@ function render(){const sums=scannedSum(),total=state.inventory.length,items=sta
  $('countIssues').textContent=over+exceptions;$('countScans').textContent=state.history.filter(h=>h.status==='accepted').length;
  $('progressFill').style.width=(total?done/total*100:0)+'%';$('progressLabel').textContent='完成率 '+(total?Math.round(done/total*100):0)+'%（'+done+' / '+total+' 项）';
  $('warehouseOptions').innerHTML=[...new Set(state.inventory.map(x=>x.warehouse))].sort().map(x=>'<option value="'+safe(x)+'"></option>').join('');
- $('reportInfo').innerHTML=state.reportName?'<span><strong>'+safe(state.reportName)+'</strong><br><span class="muted">'+safe(state.importedAt)+' · '+total+' 个合并库存项目</span></span><span class="pill ok">报表已导入</span>':'<span class="muted">尚未导入报表</span>';
+ $('reportInfo').innerHTML=state.reportName?'<span><strong>'+safe(state.reportName)+'</strong><br><span class="muted">'+safe(state.importedAt)+' · '+total+tr(' 个合并库存项目')+'</span></span><span class="pill ok">'+tr('报表已导入')+'</span>':'<span class="muted">尚未导入报表</span>';
  let q=cleanCode($('searchInventory').value||'');let filtered=items.filter(r=>(invFilter==='all'||(invFilter==='issues'?r.status!=='done':r.status===invFilter))&&(!q||[r.part,r.name,r.spec,r.warehouse,r.location,r.lot].some(v=>cleanCode(v).includes(q))));
  $('tableSummary').textContent=filtered.length+' / '+total+' 项记录';
  $('inventoryBody').innerHTML=filtered.length?filtered.slice(0,1500).map(r=>'<tr><td>'+pill(r.status)+'</td><td>'+safe(r.part)+'</td><td class="namecol">'+safe(r.name)+'</td><td>'+safe(r.spec)+'</td><td>'+safe(r.warehouse)+'</td><td>'+safe(r.location)+'</td><td>'+safe(r.lot)+'</td><td class="num">'+displayNumber(r.quantity)+'</td><td class="num">'+displayNumber(r.scanned)+'</td><td class="num '+(r.difference<0?'amber-text':r.difference>0?'red-text':'green-text')+'">'+displayNumber(r.difference)+'</td><td>'+r.count+'</td></tr>').join(''):'<tr><td colspan="11" class="blank">'+(total?'目前筛选没有项目':'请先导入 ERP 报表')+'</td></tr>';
  if(filtered.length>1500)$('tableSummary').textContent+='（画面只显示前 1500 项，导出包含全部）';
  let histFilter=$('historyFilter').value;let history=state.history.filter(h=>histFilter==='all'||(histFilter==='accepted'?h.status==='accepted':h.status!=='accepted')).slice().reverse();
  $('historySummary').textContent=history.length+' 笔记录';
- $('historyBody').innerHTML=history.length?history.slice(0,500).map(h=>'<tr><td>'+safe(h.at)+'</td><td>'+pill(h.status)+'</td><td>'+safe(h.label)+'</td><td>'+safe(h.part)+'</td><td>'+safe(h.warehouse)+'</td><td>'+safe(h.location)+'</td><td>'+safe(h.actualWarehouse||'—')+'</td><td>'+safe(h.actualLocation||'—')+'</td><td>'+safe(h.erpWarehouse||'—')+'</td><td>'+safe(h.erpLocation||'—')+'</td><td>'+safe(h.lot)+'</td><td class="num">'+(Number.isFinite(h.weight)?displayNumber(h.weight):'—')+'</td><td class="namecol">'+safe(h.message)+'</td><td><button class="btn small-btn danger" data-delete-id="'+h.id+'">删除</button></td></tr>').join(''):'<tr><td colspan="14" class="blank">暂无扫描记录</td></tr>';
+ $('historyBody').innerHTML=history.length?history.slice(0,500).map(h=>'<tr><td>'+safe(h.at)+'</td><td>'+pill(h.status)+'</td><td>'+safe(h.label)+'</td><td>'+safe(h.part)+'</td><td>'+safe(h.warehouse)+'</td><td>'+safe(h.location)+'</td><td>'+safe(h.actualWarehouse||'—')+'</td><td>'+safe(h.actualLocation||'—')+'</td><td>'+safe(h.erpWarehouse||'—')+'</td><td>'+safe(h.erpLocation||'—')+'</td><td>'+safe(h.lot)+'</td><td class="num">'+(Number.isFinite(h.weight)?displayNumber(h.weight):'—')+'</td><td class="namecol">'+safe(tr(h.message))+'</td><td><button class="btn small-btn danger" data-delete-id="'+h.id+'">'+tr('删除')+'</button></td></tr>').join(''):'<tr><td colspan="14" class="blank">暂无扫描记录</td></tr>';
  if(history.length>500)$('historySummary').textContent+='（仅显示最新 500 笔，导出包含全部）';
 }
 function revokeUrl(blob,name){let url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000)}
@@ -308,8 +309,8 @@ async function exportExcel(){if(!state.inventory.length){msg('请先导入 ERP �
  const counts={done:rows.filter(r=>r.status==='done').length,pending:rows.filter(r=>r.status==='pending').length,short:rows.filter(r=>r.status==='short').length,over:rows.filter(r=>r.status==='over').length};
  const summary=[['Stock Take Summary','Value'],['ERP file',state.reportName],['Import time',state.importedAt],['Export time',now()],['ERP inventory lines',rows.length],['Completed',counts.done],['Not yet counted',counts.pending],['Quantity short',counts.short],['Over quantity',counts.over],['Accepted scans',history.filter(h=>h.status==='accepted').length],['Exceptional scans',history.filter(h=>h.status!=='accepted').length],['Physical position mismatch',history.filter(h=>h.status==='mismatch').length],['Ambiguous ERP row',history.filter(h=>h.status==='ambiguous').length],['V1.0 legacy scans requiring recheck',history.filter(h=>h.status==='legacy').length],['Quantity tolerance (kg)',TOLERANCE],['Source','Local browser data']];
  const rec=[['Status','Part No.','Description','Specification','Warehouse','Location','Lot No.','ERP Qty (KG)','Scanned Qty (KG)','Difference (KG)','Label Count','Unit'],...rows.map(r=>[statusInfo(r.status)[0],r.part,r.name,r.spec,r.warehouse,r.location,r.lot,r.quantity,r.scanned,r.difference,r.count,r.unit])];
- const scan=[['Scanned At','Status','Label No.','Part No.','Lot No.','QR Warehouse','QR Location','Actual Warehouse','Actual Location','ERP Warehouse','ERP Location','Net Weight (KG)','Reason','Raw QR'],...history.map(h=>[h.at,statusInfo(h.status)[0],h.label||'',h.part||'',h.lot||'',h.warehouse||'',h.location||'',h.actualWarehouse||'',h.actualLocation||'',h.erpWarehouse||'',h.erpLocation||'',Number.isFinite(h.weight)?h.weight:'',h.message||'',h.raw||''])];
- const exception=[['Type','Scan Time','Label No.','Part No.','Lot No.','QR Warehouse','QR Location','Actual Warehouse','Actual Location','ERP Warehouse','ERP Location','Net Weight (KG)','Note'],...history.filter(h=>h.status!=='accepted').map(h=>[statusInfo(h.status)[0],h.at,h.label||'',h.part||'',h.lot||'',h.warehouse||'',h.location||'',h.actualWarehouse||'',h.actualLocation||'',h.erpWarehouse||'',h.erpLocation||'',Number.isFinite(h.weight)?h.weight:'',h.message||''])];
+ const scan=[['Scanned At','Status','Label No.','Part No.','Lot No.','QR Warehouse','QR Location','Actual Warehouse','Actual Location','ERP Warehouse','ERP Location','Net Weight (KG)','Reason','Raw QR'],...history.map(h=>[h.at,statusInfo(h.status)[0],h.label||'',h.part||'',h.lot||'',h.warehouse||'',h.location||'',h.actualWarehouse||'',h.actualLocation||'',h.erpWarehouse||'',h.erpLocation||'',Number.isFinite(h.weight)?h.weight:'',tr(h.message||''),h.raw||''])];
+ const exception=[['Type','Scan Time','Label No.','Part No.','Lot No.','QR Warehouse','QR Location','Actual Warehouse','Actual Location','ERP Warehouse','ERP Location','Net Weight (KG)','Note'],...history.filter(h=>h.status!=='accepted').map(h=>[statusInfo(h.status)[0],h.at,h.label||'',h.part||'',h.lot||'',h.warehouse||'',h.location||'',h.actualWarehouse||'',h.actualLocation||'',h.erpWarehouse||'',h.erpLocation||'',Number.isFinite(h.weight)?h.weight:'',tr(h.message||'')])];
  const actualSummary=[['Actual Warehouse','Actual Racking No.','Part No.','Lot No.','Labels Scanned','Physical Weight (KG)','Triple-Matched Weight (KG)','Exception Weight (KG)','Statuses'],...(()=>{
    const map=new Map();for(const h of history){if(!h.part||!h.actualWarehouse||!h.actualLocation||!Number.isFinite(h.weight)||h.status==='duplicate'||h.status==='legacy')continue;
      const key=[h.actualWarehouse,h.actualLocation,h.part,h.lot].join('\u001f');if(!map.has(key))map.set(key,{wh:h.actualWarehouse,loc:h.actualLocation,part:h.part,lot:h.lot,labels:new Set(),weight:0,accepted:0,exception:0,statuses:new Set()});
@@ -365,8 +366,8 @@ async function toggleCamera(){if(cameraStream){await stopCamera();return}
  $('cameraVideo').srcObject=cameraStream;await $('cameraVideo').play();$('scannerPanel').classList.add('active');$('cameraBtn').textContent='关闭相机';scanFrames();
  }catch(e){await stopCamera();msg('相机无法启动：'+(e.name==='NotAllowedError'?'请允许浏览器使用相机':e.message))}
 }
-function addBackupButtons(){let buttons=document.querySelector('.headrow>.buttons');let btn=document.createElement('button');btn.className='btn';btn.textContent='↓ JSON 备份';btn.id='backupBtn';
- let trigger=document.createElement('label');trigger.className='btn';trigger.textContent='↑ 恢复 JSON';trigger.htmlFor='backupInput';
+function addBackupButtons(){let buttons=document.querySelector('.headrow>.buttons');let btn=document.createElement('button');btn.className='btn';btn.textContent=tr('↓ JSON 备份');btn.id='backupBtn';
+ let trigger=document.createElement('label');trigger.className='btn';trigger.textContent=tr('↑ 恢复 JSON');trigger.htmlFor='backupInput';
  let input=document.createElement('input');input.type='file';input.accept='.json,application/json';input.id='backupInput';input.hidden=true;buttons.insertBefore(btn,$('resetAll'));buttons.insertBefore(trigger,$('resetAll'));buttons.append(input);
  btn.addEventListener('click',exportJson);input.addEventListener('change',()=>importJson(input.files[0]));
 }
@@ -391,5 +392,6 @@ function hookEvents(){addBackupButtons();$('reportFile').addEventListener('chang
  $('installBtn').addEventListener('click',async()=>{if(!deferredInstall)return;deferredInstall.prompt();await deferredInstall.userChoice;deferredInstall=null;$('installBtn').hidden=true});
  window.addEventListener('pagehide',stopCamera);
 }
+window.StockTakeRender=()=>{render();updatePositionUI();window.StockTakeI18n?.apply()};
 hookEvents();loadPromise=initialize();
 })();

@@ -1,3 +1,25 @@
+# TMC Warehouse Stock Take V1.2 — 中文 / English
+
+## 新增：中英文双语 / What's new
+
+- 页面右上角新增 **🌐 中文 / English**，可即时切换；语言偏好记在当前浏览器，不影响 ERP 或扫描历史。
+- 中文、英文界面包括导航、操作按钮、ERP 导入、实际仓库/储位、扫描提示、盘点状态、扫描历史、异常原因和导出通知。
+- 中文 / English 两种界面共用相同 ERP 数据、扫描结果和盘点记录。Excel / CSV 栏名保持可读的英文字段名，状态和异常原因按选用语言输出。
+- 继续使用之前选定的 **蓝色扫码枪 Stock Take 图标**。新版 `sw.js` 使用 V1.2 缓存版本，帮助 PWA 更新。
+- QR 解析、实际位置三方比对、防重复、JSON 备份、离线支持功能保持不变。
+
+## 更新现有 GitHub Pages / Upgrade instructions
+
+1. **先在网站内导出 JSON 备份**，保留重要盘点资料。
+2. 解压 ZIP，将所有文件直接上传到原 `tmc-stock-take.github.io` Repository 的根目录，**包括新文件 `i18n.js`**、`index.html`、`app.js`、`sw.js`、图标和 `vendor` 文件夹。
+3. 在 GitHub 提交 `Commit changes`，到 `Actions` 确认 GitHub Pages 部署成功。
+4. 手机打开 `https://tmc-stock-take.github.io/`，看左上角是否显示 **V1.2**；如仍是旧版，关闭 PWA 后用 Chrome 刷新网站。
+5. 在右上角切换 `English` 或 `中文`。**不要清除浏览器网站数据**，否则本地盘点记录可能丢失。
+
+**English:** Export a JSON backup first. Upload all unzipped files—including **i18n.js**—to the existing repository root, commit, and verify the Pages deployment. Reopen the site and choose English from the language selector. Do not clear site data.
+
+---
+
 # TMC Warehouse Stock Take V1.1.1 — 已换成你选的蓝色扫码图标
 
 这是 **V1.1 盘点系统的图标更新版**。保留 ERP 导入、QR 扫描、实际仓库/储位三方比对、盘点记录及导出功能；本次只更新 App/浏览器图标和静态资源版本。
