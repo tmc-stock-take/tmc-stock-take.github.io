@@ -1,3 +1,28 @@
+# TMC Stock Take V1.3.5 — Excel 直接下载与扫码音效
+
+## 升级内容
+
+1. **一个标准 Excel (.xlsx) 文件**：点击绿色「↓ 导出 Excel (.xlsx)」，下载一个包含 7 个工作表的 Office Open XML 工作簿（LocationVariance、Summary、Reconciliation、ScanHistory、Exceptions、ActualLocations、LocationDetails），并设置正确的 XLSX 文件 MIME 类型。不会把 sheet1、sheet2 分别下载。原有彩色状态、完整料号、实际储位精确对应不变。
+2. **请勿解压 .xlsx**：.xlsx 内部本来是 ZIP 格式，Windows 如果尚未安装 Excel 或未正确关联，会把 `.xlsx` 显示成 “Compressed (zipped) Folder”。此时文件仍是有效的 Excel 工作簿；需要安装 Excel / WPS / LibreOffice，或上传至 Excel Online 打开。网页无法改变 Windows 的文件关联。
+3. **三种扫码音效**：清脆（默认）、扫描枪、柔和；可调音量（10%–100%），提供成功、位置差异、重复及错误四种试听。每个结果使用不同声响，设置会记住。全部采用本机 Web Audio，不需要下载音频文件。手机需允许声音播放，设备媒体音量不能静音。
+4. 保留 V1.3.4 多储位、ERP 行选择、防重复、中文/English、扫码记录、数据备份及 Supabase 模式。无数据库结构更新。
+
+## 上传 GitHub Pages
+
+1. 建议先导出 JSON 备份，不要清除浏览器网站资料。
+2. 解压 V1.3.5 ZIP；把**里面的所有网站文件**（包括 `vendor`）上传到原 `tmc-stock-take.github.io` Repository 根目录并覆盖。
+3. 点击 Commit changes，检查 GitHub Actions 已部署。Chrome 打开网站确认顶部 V1.3.5。
+4. 电脑点击「导出 Excel (.xlsx)」，请直接打开下载的 `.xlsx`，**不要选择 Extract All**。
+5. 手机扫码区选择音效风格和音量，点「试听」检查；必要时增加手机媒体音量。
+
+## 安全注意
+
+- 本机数据不会因更换音效而删除；真实云端同步依赖现有 Supabase 配置。
+- CSV 无法保留 Excel 单元格颜色，请用 .xlsx。
+- `.xlsx` 是一个基于 ZIP 封装的 Excel 工作簿，因此在未正确安装/关联表格软件的电脑上，显示为 ZIP 图标并不代表下载程序有问题。
+
+---
+
 # TMC Stock Take V1.3.4 — Excel 盘点报告优化（Excel Export Fix）
 
 ## 本次更新（与 V1.3.3 比较）

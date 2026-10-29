@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#102642">
   <meta name="description" content="TMC Warehouse Stock Take — ERP import, QR scan and reconciliation, offline ready.">
-  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="manifest" href="manifest.webmanifest?v=135">
   <link rel="icon" type="image/png" sizes="64x64" href="favicon-64.png">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
   <title>TMC Stock Take | Warehouse Inventory</title>
@@ -36,7 +36,7 @@
     input[type=text],input[type=number],select{border:1px solid #ccd8e5;border-radius:9px;background:#fff;color:#1c3551;padding:10px 11px;width:100%;outline:none;min-height:41px}
     input:focus,select:focus{border-color:#368fcf;box-shadow:0 0 0 3px #348ccf18}
     .statusbox{min-height:65px;background:#f2f6fa;border:1px solid #e4ebf2;border-radius:10px;padding:12px 14px;margin-top:12px;font-size:13px;line-height:1.6}
-    .sound-controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:9px 0}.sound-controls label{display:inline-flex;align-items:center;gap:6px;color:#294760;font-size:13px;font-weight:650;cursor:pointer}.sound-controls input{width:18px;height:18px;accent-color:#078574}.qr-reference{color:#75889a}.flag-reference{background:#eaf2fb;color:#526b84;padding:5px 9px;border-radius:7px;display:inline-block}
+    .sound-settings{background:#f5f9fd;border:1px solid #d6e6f2;border-radius:10px;padding:12px;margin:10px 0}.sound-options{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px;margin-top:9px}.sound-options label{font-size:12px;color:#405b75;font-weight:650;display:flex;flex-direction:column;gap:4px}.sound-options select{min-width:115px;max-width:100%;border-radius:7px;border:1px solid #c6d8e8;padding:7px 9px;background:white;color:#14263b;height:35px}.sound-options input[type="range"]{min-width:100px;width:120px;accent-color:#078574}.sound-controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:9px 0}.sound-controls label{display:inline-flex;align-items:center;gap:6px;color:#294760;font-size:13px;font-weight:650;cursor:pointer}.sound-controls input{width:18px;height:18px;accent-color:#078574}.qr-reference{color:#75889a}.flag-reference{background:#eaf2fb;color:#526b84;padding:5px 9px;border-radius:7px;display:inline-block}
     .erp-choice{border:2px solid #f2bd68;border-radius:12px;padding:16px;margin:12px 0;background:#fffcf5}
     .erp-choice.hide{display:none}.choice-title{font-weight:800;color:#7c5010;font-size:16px;margin-bottom:8px}
     .erp-choice p{line-height:1.5;font-size:13px;color:#654d2d}
@@ -90,9 +90,9 @@
   </style>
 </head>
 <body>
-<header class="topbar"><div class="brand"><img src="icon-192.png" alt="TMC Stock Take"><div><strong>TMC STOCK TAKE</strong><small>ERP × Physical Location · V1.3.4</small></div></div><div class="toplinks"><label class="lang-wrap" for="languageSelect"><span>🌐</span><select id="languageSelect" aria-label="Language / 语言"><option value="zh">中文</option><option value="en">English</option></select></label><span class="version">LOCAL / CLOUD SYNC</span><button class="btn small-btn" id="installBtn" hidden>⬇ 安装 App</button></div></header>
+<header class="topbar"><div class="brand"><img src="icon-192.png" alt="TMC Stock Take"><div><strong>TMC STOCK TAKE</strong><small>ERP × Physical Location · V1.3.5</small></div></div><div class="toplinks"><label class="lang-wrap" for="languageSelect"><span>🌐</span><select id="languageSelect" aria-label="Language / 语言"><option value="zh">中文</option><option value="en">English</option></select></label><span class="version">LOCAL / CLOUD SYNC</span><button class="btn small-btn" id="installBtn" hidden>⬇ 安装 App</button></div></header>
 <main class="wrap">
- <div class="headrow"><div><h1>仓库库存盘点 <span class="muted">/ Stock Take</span></h1><div class="muted">导入 ERP → 确认实际位置 → 扫描 QR（识别料号/批号/重量）→ ERP 与实际位置核查</div></div><div class="buttons"><button id="exportExcel" class="btn green">↓ 导出 Excel</button><button id="exportCsv" class="btn">↓ 导出 CSV</button><button id="resetAll" class="btn danger">清空盘点</button></div></div>
+ <div class="headrow"><div><h1>仓库库存盘点 <span class="muted">/ Stock Take</span></h1><div class="muted">导入 ERP → 确认实际位置 → 扫描 QR（识别料号/批号/重量）→ ERP 与实际位置核查</div></div><div class="buttons"><button id="exportExcel" class="btn green">↓ 导出 Excel (.xlsx)</button><button id="exportCsv" class="btn">↓ 导出 CSV</button><button id="resetAll" class="btn danger">清空盘点</button></div></div>
 
  <section class="card cloud-card" id="cloudSection" aria-label="Cloud Sync / 云端同步">
   <div class="cloud-title"><h2>☁ 电脑 ↔ 手机实时同步 / PC ↔ Phone Live Sync</h2><button type="button" id="cloudReconfigure" class="btn small-btn">⚙ 配置 / Setup</button><button type="button" id="cloudRefreshBtn" class="btn small-btn" disabled>↻ 刷新 / Refresh</button></div>
@@ -148,17 +148,31 @@
    <div class="section-head"><div><h2>③ 扫描实物 QR 标签</h2><p class="muted">Scan to identify material; compare ERP × Actual location</p></div><button id="cameraBtn" class="btn primary">开启相机扫描</button></div>
    <div id="scannerPanel" class="scanner"><div class="scan-hint"><span>▦</span><strong>等待扫描 QR Code</strong><small>手机相机、扫描枪、手动输入或上传标签照片</small></div><video id="cameraVideo" playsinline autoplay muted></video><div class="scanlines"></div></div>
    <label class="field-label" for="scanInput">手动输入 / 2D Scanner Input</label><div class="input-row"><input id="scanInput" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="NO.009998|L002|3A1-113|20260617|..."><button id="scanBtn" class="btn green">确认扫描</button></div>
-   <div class="sound-controls"><label for="soundEnabled"><input type="checkbox" id="soundEnabled" checked> <span>扫码提示音 / Beep sound</span></label><button id="soundTestBtn" class="btn small-btn" type="button">♫ 试听 / Test</button></div><div class="buttons" style="margin-top:9px"><label class="btn" for="photoInput">从照片读取 QR</label><input id="photoInput" type="file" accept="image/*" style="display:none"><button id="demoScanBtn" class="btn">试扫示例标签</button><button id="undoBtn" class="btn danger">撤销上一笔</button></div>
+   <div class="sound-settings">
+    <div class="sound-controls"><label for="soundEnabled"><input type="checkbox" id="soundEnabled" checked> <span>扫码提示音 / Beep sound</span></label><span class="muted">成功、位置差异、重复和错误分别提示</span></div>
+    <div class="sound-options">
+      <label for="soundStyle">音效风格 / Beep style
+        <select id="soundStyle"><option value="crisp">清脆 / Crisp</option><option value="scanner">扫描枪 / Scanner</option><option value="soft">柔和 / Soft</option></select>
+      </label>
+      <label for="soundVolume">音量 / Volume
+        <span style="display:flex;align-items:center;gap:5px"><input type="range" id="soundVolume" min="10" max="100" step="10" value="60"><output id="soundVolumeValue">60%</output></span>
+      </label>
+      <label for="soundTestType">试听结果 / Test result
+        <select id="soundTestType"><option value="success">成功 / Success</option><option value="warning">位置差异 / Variance</option><option value="duplicate">重复 / Duplicate</option><option value="error">错误 / Error</option></select>
+      </label>
+      <button id="soundTestBtn" class="btn small-btn" type="button">♫ 试听 / Test</button>
+    </div>
+   </div><div class="buttons" style="margin-top:9px"><label class="btn" for="photoInput">从照片读取 QR</label><input id="photoInput" type="file" accept="image/*" style="display:none"><button id="demoScanBtn" class="btn">试扫示例标签</button><button id="undoBtn" class="btn danger">撤销上一笔</button></div>
    <div id="scanStatus" class="statusbox" role="status"><strong>准备就绪</strong>请先导入 ERP 报表，并确认实际盘点位置。</div><div id="erpChoicePanel" class="erp-choice hide" aria-live="polite"></div><div id="scanComparison" class="comparison-panel hide" aria-live="polite"></div>
    <div class="tip">示例 QR：<code>NO.009998|L002|3A1-113|20260617|5899951013108|190.300</code>。相机需要 HTTPS（例如 GitHub Pages）或 localhost；若浏览器不支持 QR 相机识别，可以使用 2D 扫描枪或手动输入。</div>
   </div>
  </section>
  <section class="card tablesection"><div class="section-head"><div><h2>④ ERP 盘点比对 / Inventory Reconciliation</h2><p class="muted">按项目显示 ERP 数量、已扫描重量及差异</p></div><div class="buttons"><button id="showDiscrepancy" class="btn small-btn">只看差异</button><button id="showAllRows" class="btn small-btn">显示全部</button></div></div><div class="filters"><input id="searchInventory" type="text" placeholder="搜索料号 / 批号 / 储位 / 品名"><select id="statusFilter" aria-label="状态筛选"><option value="all">全部状态</option><option value="done">已完成</option><option value="pending">待盘点</option><option value="short">数量不足</option><option value="over">数量超出</option></select><span id="tableSummary" class="muted">0 项记录</span></div><div class="scrolltable"><table class="data-table"><thead><tr><th>状态</th><th>料号 Part No.</th><th>品名 Description</th><th>规格</th><th>仓库</th><th>储位</th><th>批号</th><th class="num">ERP 数量</th><th class="num">扫描重量</th><th class="num">差异 (实-账)</th><th>标签数</th></tr></thead><tbody id="inventoryBody"><tr><td colspan="11" class="blank">请先导入报表</td></tr></tbody></table></div></section>
  <section class="card tablesection"><div class="section-head"><div><h2>⑤ 扫描记录 / Scan History</h2><p class="muted">保存每个标签编号、重量、时间与异常原因</p></div><button id="clearScans" class="btn danger small-btn">清空扫描记录</button></div><div class="filters"><select id="historyFilter" aria-label="扫描记录筛选"><option value="all">全部扫描</option><option value="accepted">有效扫描</option><option value="exception">异常 / 重复</option></select><span id="historySummary" class="muted">0 笔记录</span></div><div class="scrolltable"><table class="data-table"><thead><tr><th>扫描时间</th><th>结果</th><th>Label No.</th><th>料号</th><th>标签仓库</th><th>标签储位</th><th>实际仓库</th><th>实际储位</th><th>ERP 仓库</th><th>ERP 储位</th><th>批号</th><th class="num">净重 KG</th><th>差异 / 备注</th><th>操作</th></tr></thead><tbody id="historyBody"><tr><td colspan="14" class="blank">暂无扫描记录</td></tr></tbody></table></div></section>
- <div class="foot">TMC Stock Take V1.3.4 · 本机模式仅存设备；登录云端后 ERP 与扫描数据存入 Supabase · 请定期导出 Excel/JSON 备份<br>本机模式数据不会自动同步到云端；云端模式必须联网，扫描保存失败时请重新扫描。旧版位置异常记录不会自动转为已盘点，需重新扫描或核查。</div>
+ <div class="foot">TMC Stock Take V1.3.5 · 本机模式仅存设备；登录云端后 ERP 与扫描数据存入 Supabase · 请定期导出 Excel/JSON 备份<br>本机模式数据不会自动同步到云端；云端模式必须联网，扫描保存失败时请重新扫描。旧版位置异常记录不会自动转为已盘点，需重新扫描或核查。</div>
 </main><div id="toast" class="toast" role="alert"></div>
-<script src="vendor/jszip.min.js"></script><script src="i18n.js"></script>
+<script src="vendor/jszip.min.js"></script><script src="i18n.js?v=135"></script>
 <script src="cloud-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="cloud.js"></script><script src="sound.js"></script><script src="app.js" defer></script>
+<script src="cloud.js"></script><script src="sound.js?v=135"></script><script src="app.js?v=135" defer></script>
 </body></html>

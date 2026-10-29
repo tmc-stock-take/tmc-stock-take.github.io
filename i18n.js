@@ -12,6 +12,10 @@ const raw = [
 ['ERP × 实际位置（QR 仅供识别）','ERP × Actual Locations (QR for ID only)'],
 
 ['扫码提示音 / Beep sound','Beep sound'],['♫ 试听 / Test','♫ Test Beep'],
+['成功、位置差异、重复和错误分别提示','Different sounds for success, location variance, duplicate and error'],
+['音效风格 / Beep style','Beep style'],['清脆 / Crisp','Crisp'],['扫描枪 / Scanner','Scanner'],['柔和 / Soft','Soft'],
+['音量 / Volume','Volume'],['试听结果 / Test result','Test result'],['成功 / Success','Success'],['位置差异 / Variance','Location variance'],['重复 / Duplicate','Duplicate'],['错误 / Error','Error'],
+['↓ 导出 Excel (.xlsx)','↓ Export Excel (.xlsx)'],
 ['已盘点标签','Counted Labels'],['QR 标签（仅参考）','QR Label (reference only)'],
 ['QR 仓库和储位仅供记录，不参与比对','QR warehouse and rack are recorded for reference only, not compared'],
 ['QR 标签旧仓库/储位仅作记录','Old QR warehouse/location recorded for reference'],

@@ -1,4 +1,4 @@
-/* TMC Stock Take V1.3.4: color-coded exports, text IDs, matching actual rack per ERP row */
+/* TMC Stock Take V1.3.5: standard OOXML download (.xlsx) with correct MIME + sound selection */
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);
@@ -432,7 +432,15 @@ async function exportExcel(){if(!state.inventory.length){msg('请先导入 ERP �
  zip.file('xl/_rels/workbook.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+sheets.map((_,i)=>'<Relationship Id="rId'+(i+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet'+(i+1)+'.xml"/>').join('')+'<Relationship Id="rId'+(sheets.length+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>');
  zip.file('xl/styles.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="6"><font><sz val="11"/><name val="Aptos"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Aptos"/></font><font><b/><sz val="11"/><color rgb="FF076B4C"/><name val="Aptos"/></font><font><b/><sz val="11"/><color rgb="FFAE1B35"/><name val="Aptos"/></font><font><b/><sz val="11"/><color rgb="FF8B590C"/><name val="Aptos"/></font><font><sz val="11"/><color rgb="FF64748B"/><name val="Aptos"/></font></fonts><fills count="7"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF123454"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFDCFCE7"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFE2E5"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF0C9"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF0F3F8"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="8"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="2" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="49" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="0" fontId="3" fillId="4" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="0" fontId="4" fillId="5" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="0" fontId="5" fillId="6" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>');
  sheets.forEach(([,data,widths,opts],i)=>zip.file('xl/worksheets/sheet'+(i+1)+'.xml',sheetXML(data,widths,opts)));
- revokeUrl(await zip.generateAsync({type:'blob',compression:'DEFLATE'}),'TMC_Stock_Take_'+stamp()+'.xlsx');msg('已导出 Excel：完成绿色、超出红色、完整料号、各行匹配实际储位');
+ // A genuine Office Open XML spreadsheet is a ZIP *container* internally.  Wrap
+ // it with the XLSX media type, rather than JSZip's default application/zip.
+ // This downloads ONE workbook (seven tabs), never seven sheet files.
+ const bytes=await zip.generateAsync({type:'uint8array',compression:'DEFLATE',compressionOptions:{level:6}});
+ if(bytes.length<4||bytes[0]!==0x50||bytes[1]!==0x4b||bytes[2]!==0x03||bytes[3]!==0x04)throw Error('Excel 工作簿格式验证失败');
+ const xlsxType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+ const workbook=new Blob([bytes],{type:xlsxType});
+ revokeUrl(workbook,'TMC_Stock_Take_'+stamp()+'.xlsx');
+ msg('已直接下载一个 Excel (.xlsx) 文件，内含 7 个工作表。请用 Microsoft Excel 或 Excel Online 打开，不要解压。');
  }catch(e){console.error(e);msg('Excel 导出失败：'+e.message)}
 }
 function exportJson(){revokeUrl(new Blob([JSON.stringify({version:2,exportedAt:now(),state},null,2)],{type:'application/json'}),'TMC_StockTake_Backup_'+stamp()+'.json');msg('JSON 备份已下载')}
