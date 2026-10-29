@@ -108,8 +108,8 @@ async function insertScan(raw){ensure();
  let rec=window.StockTakeCore.prepareScan(raw),currentBatchId=batch.id;
  async function insert(r){return client.from('stocktake_scans').insert({owner_id:user.id,batch_id:currentBatchId,label:r.label||'',status:r.status,payload:r})}
  let {error}=await insert(rec);
- if(error?.code==='23505'&&rec.status==='accepted'){
-  rec={...rec,status:'duplicate',message:'Label '+rec.label+' 已有三方 MATCH 记录（云端查重），重量不重复计算'};
+ if(error?.code==='23505'&&['accepted','counted_variance','counted_multi'].includes(rec.status)) {
+  rec={...rec,status:'duplicate',message:'Label '+rec.label+' 已有有效盘点记录（云端查重），重量不重复计算'};
   ({error}=await insert(rec));
  }
  if(error)throw error;

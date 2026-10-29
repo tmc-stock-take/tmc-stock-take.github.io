@@ -19,7 +19,7 @@ create table if not exists public.stocktake_scans (
   batch_id uuid not null references public.stocktake_batches(id) on delete cascade,
   owner_id uuid not null references auth.users(id) on delete cascade,
   label text not null default '',
-  status text not null check (status in ('accepted','duplicate','unmatched','invalid','mismatch','ambiguous','legacy')),
+  status text not null check (status in ('accepted','counted_variance','counted_multi','duplicate','unmatched','invalid','mismatch','ambiguous','legacy')),
   payload jsonb not null,
   created_at timestamptz not null default now()
 );
@@ -28,7 +28,7 @@ create index if not exists stocktake_batches_owner_created_idx on public.stockta
 create index if not exists stocktake_scans_batch_created_idx on public.stocktake_scans (batch_id, created_at, id);
 create index if not exists stocktake_scans_owner_idx on public.stocktake_scans (owner_id);
 -- Database-level duplicate protection, even when two devices scan simultaneously.
-create unique index if not exists stocktake_unique_accepted_label on public.stocktake_scans (batch_id, label) where status = 'accepted';
+create unique index if not exists stocktake_unique_counted_label on public.stocktake_scans (batch_id, label) where status in ('accepted','counted_variance','counted_multi');
 
 alter table public.stocktake_batches enable row level security;
 alter table public.stocktake_scans enable row level security;
@@ -69,3 +69,11 @@ begin
     alter publication supabase_realtime add table public.stocktake_scans;
   end if;
 end $$;
+
+-- V1.3.2 upgrade (safe on existing V1.3/V1.3.1 projects): new counted statuses.
+alter table public.stocktake_scans drop constraint if exists stocktake_scans_status_check;
+alter table public.stocktake_scans add constraint stocktake_scans_status_check
+  check (status in ('accepted','counted_variance','counted_multi','duplicate','unmatched','invalid','mismatch','ambiguous','legacy'));
+drop index if exists public.stocktake_unique_accepted_label;
+create unique index if not exists stocktake_unique_counted_label on public.stocktake_scans (batch_id, label)
+  where status in ('accepted','counted_variance','counted_multi');

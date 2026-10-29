@@ -36,6 +36,7 @@
     input[type=text],input[type=number],select{border:1px solid #ccd8e5;border-radius:9px;background:#fff;color:#1c3551;padding:10px 11px;width:100%;outline:none;min-height:41px}
     input:focus,select:focus{border-color:#368fcf;box-shadow:0 0 0 3px #348ccf18}
     .statusbox{min-height:65px;background:#f2f6fa;border:1px solid #e4ebf2;border-radius:10px;padding:12px 14px;margin-top:12px;font-size:13px;line-height:1.6}
+    .sound-controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:9px 0}.sound-controls label{display:inline-flex;align-items:center;gap:6px;color:#294760;font-size:13px;font-weight:650;cursor:pointer}.sound-controls input{width:18px;height:18px;accent-color:#078574}.qr-reference{color:#75889a}.flag-reference{background:#eaf2fb;color:#526b84;padding:5px 9px;border-radius:7px;display:inline-block}
     .statusbox.good{background:#eaf9f4;border-color:#afe4d4}.statusbox.warn{background:#fff7e9;border-color:#f5d7a1}.statusbox.bad{background:#fff0f1;border-color:#f2c2ca}
     .statusbox strong{display:block;font-size:14px}.tip{border-left:3px solid #3891cc;background:#f3f9fe;padding:9px 12px;margin-top:12px;color:#47637e;border-radius:0 8px 8px 0;font-size:12px;line-height:1.65}
     .tablesection{margin-top:16px}.filters{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:13px}.filters input{width:240px;max-width:100%}.filters select{width:auto;max-width:100%}
@@ -83,9 +84,9 @@
   </style>
 </head>
 <body>
-<header class="topbar"><div class="brand"><img src="icon-192.png" alt="TMC Stock Take"><div><strong>TMC STOCK TAKE</strong><small>Three-Way Stock Take · V1.3.1</small></div></div><div class="toplinks"><label class="lang-wrap" for="languageSelect"><span>🌐</span><select id="languageSelect" aria-label="Language / 语言"><option value="zh">中文</option><option value="en">English</option></select></label><span class="version">LOCAL / CLOUD SYNC</span><button class="btn small-btn" id="installBtn" hidden>⬇ 安装 App</button></div></header>
+<header class="topbar"><div class="brand"><img src="icon-192.png" alt="TMC Stock Take"><div><strong>TMC STOCK TAKE</strong><small>ERP × Physical Location · V1.3.2</small></div></div><div class="toplinks"><label class="lang-wrap" for="languageSelect"><span>🌐</span><select id="languageSelect" aria-label="Language / 语言"><option value="zh">中文</option><option value="en">English</option></select></label><span class="version">LOCAL / CLOUD SYNC</span><button class="btn small-btn" id="installBtn" hidden>⬇ 安装 App</button></div></header>
 <main class="wrap">
- <div class="headrow"><div><h1>仓库库存盘点 <span class="muted">/ Stock Take</span></h1><div class="muted">导入 ERP 报表 → 设置实际盘点位置 → 扫描标签 QR → 三方自动比对</div></div><div class="buttons"><button id="exportExcel" class="btn green">↓ 导出 Excel</button><button id="exportCsv" class="btn">↓ 导出 CSV</button><button id="resetAll" class="btn danger">清空盘点</button></div></div>
+ <div class="headrow"><div><h1>仓库库存盘点 <span class="muted">/ Stock Take</span></h1><div class="muted">导入 ERP → 确认实际位置 → 扫描 QR（识别料号/批号/重量）→ ERP 与实际位置核查</div></div><div class="buttons"><button id="exportExcel" class="btn green">↓ 导出 Excel</button><button id="exportCsv" class="btn">↓ 导出 CSV</button><button id="resetAll" class="btn danger">清空盘点</button></div></div>
 
  <section class="card cloud-card" id="cloudSection" aria-label="Cloud Sync / 云端同步">
   <div class="cloud-title"><h2>☁ 电脑 ↔ 手机实时同步 / PC ↔ Phone Live Sync</h2><button type="button" id="cloudReconfigure" class="btn small-btn">⚙ 配置 / Setup</button><button type="button" id="cloudRefreshBtn" class="btn small-btn" disabled>↻ 刷新 / Refresh</button></div>
@@ -115,8 +116,8 @@
   <div class="card"><div class="metric-label">ERP 库存项目</div><div id="countTotal" class="metric-value">0</div><div class="metric-note">Unique inventory lines</div></div>
   <div class="card"><div class="metric-label">已完成盘点</div><div id="countDone" class="metric-value green-text">0</div><div class="metric-note">Matched quantity</div></div>
   <div class="card"><div class="metric-label">待盘点 / 数量不足</div><div id="countPending" class="metric-value amber-text">0</div><div class="metric-note">Not yet fully counted</div></div>
-  <div class="card"><div class="metric-label">异常 / 数量超出</div><div id="countIssues" class="metric-value red-text">0</div><div class="metric-note">Location mismatches + overstock items</div></div>
-  <div class="card"><div class="metric-label">三方匹配标签</div><div id="countScans" class="metric-value">0</div><div class="metric-note">Triple-matched · No duplicated weight</div></div>
+  <div class="card"><div class="metric-label">异常 / 数量超出</div><div id="countIssues" class="metric-value red-text">0</div><div class="metric-note">Location variance requiring review + overstock</div></div>
+  <div class="card"><div class="metric-label">已盘点标签</div><div id="countScans" class="metric-value">0</div><div class="metric-note">Counted labels · Includes location variances</div></div>
  </section>
  <section class="main-grid">
   <div class="card">
@@ -125,7 +126,7 @@
    <div id="mappingPanel" class="mapping"><h3>确认报表栏位对应 / Column Mapping</h3><p id="mappingInfo" class="muted">自动辨识后可以自行调整</p><div id="mappingFields" class="map-grid"></div><div id="mappingPreview" class="mapping-preview"></div><div class="buttons"><button id="confirmImport" class="btn primary">确认导入报表</button><button id="cancelImport" class="btn">取消</button></div></div>
    <div id="reportInfo" class="reportinfo"><span class="muted">尚未导入报表</span></div>
    <div class="progress"><div id="progressFill"></div></div><div id="progressLabel" class="muted small">完成率 0%</div>
-   <div class="tip">先匹配「料号 + 批号」，再将 ERP、QR 标签和实际盘点仓库 / 储位三方核对。只有三方一致且实际位置唯一的标签会累计重量；多实际储位会单独记录并提示核对，不会拆分或重复计算标签重量。</div>
+   <div class="tip">按 QR 的「料号 + 批号」识别 ERP 项目，重量每标签计一次；只比对 ERP 与实际位置。QR 标签的旧仓库/储位不参与匹配。实物已找到但有位置差异，仍计入已盘点并单独列出待调整。</div>
  <section class="card actual-position" aria-label="实盘位置">
    <div class="section-head"><div><h2>② 设置实际盘点位置 <span class="muted">/ Actual Stock Location</span></h2><p class="muted">确认实际仓库及一个或多个占用储位；连续扫描时会保留整组储位</p></div><div id="activePositionBadge" class="pill wait">尚未设置</div></div>
    <div class="position-grid">
@@ -134,24 +135,24 @@
     <div class="position-actions"><button id="confirmPosition" class="btn primary fullwidth">✓ 确认当前盘点位置</button></div>
    </div>
    <div id="positionNotice" class="position-notice">可同时记录多个实际储位。必须先确认整组位置再扫描；更换储位后重新确认。</div>
-   <div class="tip">比对三个来源：<b>ERP 报表位置</b>、<b>标签 QR 位置</b>、<b>仓库人员确认的实际位置</b>。只有 ERP、QR、实际仓库和单一储位完全一致才会计入有效重量。多实际储位会保留详细清单并标记异常，防止自动认定正确或多计重量。</div>
+   <div class="tip">只比对 <b>ERP 仓库/储位</b> 与 <b>实际仓库/储位</b>。QR 标签仓库/储位可能是旧位置，仅保存作参考，不影响盘点计重。实际有多个储位时整组保存、重量只计一次，但不能自动指定到其中某一个储位。</div>
  </section>
   </div>
   <div class="card">
-   <div class="section-head"><div><h2>③ 扫描实物 QR 标签</h2><p class="muted">Check ERP × QR × Actual Location</p></div><button id="cameraBtn" class="btn primary">开启相机扫描</button></div>
+   <div class="section-head"><div><h2>③ 扫描实物 QR 标签</h2><p class="muted">Scan to identify material; compare ERP × Actual location</p></div><button id="cameraBtn" class="btn primary">开启相机扫描</button></div>
    <div id="scannerPanel" class="scanner"><div class="scan-hint"><span>▦</span><strong>等待扫描 QR Code</strong><small>手机相机、扫描枪、手动输入或上传标签照片</small></div><video id="cameraVideo" playsinline autoplay muted></video><div class="scanlines"></div></div>
    <label class="field-label" for="scanInput">手动输入 / 2D Scanner Input</label><div class="input-row"><input id="scanInput" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="NO.009998|L002|3A1-113|20260617|..."><button id="scanBtn" class="btn green">确认扫描</button></div>
-   <div class="buttons" style="margin-top:9px"><label class="btn" for="photoInput">从照片读取 QR</label><input id="photoInput" type="file" accept="image/*" style="display:none"><button id="demoScanBtn" class="btn">试扫示例标签</button><button id="undoBtn" class="btn danger">撤销上一笔</button></div>
+   <div class="sound-controls"><label for="soundEnabled"><input type="checkbox" id="soundEnabled" checked> <span>扫码提示音 / Beep sound</span></label><button id="soundTestBtn" class="btn small-btn" type="button">♫ 试听 / Test</button></div><div class="buttons" style="margin-top:9px"><label class="btn" for="photoInput">从照片读取 QR</label><input id="photoInput" type="file" accept="image/*" style="display:none"><button id="demoScanBtn" class="btn">试扫示例标签</button><button id="undoBtn" class="btn danger">撤销上一笔</button></div>
    <div id="scanStatus" class="statusbox" role="status"><strong>准备就绪</strong>请先导入 ERP 报表，并确认实际盘点位置。</div><div id="scanComparison" class="comparison-panel hide" aria-live="polite"></div>
    <div class="tip">示例 QR：<code>NO.009998|L002|3A1-113|20260617|5899951013108|190.300</code>。相机需要 HTTPS（例如 GitHub Pages）或 localhost；若浏览器不支持 QR 相机识别，可以使用 2D 扫描枪或手动输入。</div>
   </div>
  </section>
  <section class="card tablesection"><div class="section-head"><div><h2>④ ERP 盘点比对 / Inventory Reconciliation</h2><p class="muted">按项目显示 ERP 数量、已扫描重量及差异</p></div><div class="buttons"><button id="showDiscrepancy" class="btn small-btn">只看差异</button><button id="showAllRows" class="btn small-btn">显示全部</button></div></div><div class="filters"><input id="searchInventory" type="text" placeholder="搜索料号 / 批号 / 储位 / 品名"><select id="statusFilter" aria-label="状态筛选"><option value="all">全部状态</option><option value="done">已完成</option><option value="pending">待盘点</option><option value="short">数量不足</option><option value="over">数量超出</option></select><span id="tableSummary" class="muted">0 项记录</span></div><div class="scrolltable"><table class="data-table"><thead><tr><th>状态</th><th>料号 Part No.</th><th>品名 Description</th><th>规格</th><th>仓库</th><th>储位</th><th>批号</th><th class="num">ERP 数量</th><th class="num">扫描重量</th><th class="num">差异 (实-账)</th><th>标签数</th></tr></thead><tbody id="inventoryBody"><tr><td colspan="11" class="blank">请先导入报表</td></tr></tbody></table></div></section>
  <section class="card tablesection"><div class="section-head"><div><h2>⑤ 扫描记录 / Scan History</h2><p class="muted">保存每个标签编号、重量、时间与异常原因</p></div><button id="clearScans" class="btn danger small-btn">清空扫描记录</button></div><div class="filters"><select id="historyFilter" aria-label="扫描记录筛选"><option value="all">全部扫描</option><option value="accepted">有效扫描</option><option value="exception">异常 / 重复</option></select><span id="historySummary" class="muted">0 笔记录</span></div><div class="scrolltable"><table class="data-table"><thead><tr><th>扫描时间</th><th>结果</th><th>Label No.</th><th>料号</th><th>标签仓库</th><th>标签储位</th><th>实际仓库</th><th>实际储位</th><th>ERP 仓库</th><th>ERP 储位</th><th>批号</th><th class="num">净重 KG</th><th>差异 / 备注</th><th>操作</th></tr></thead><tbody id="historyBody"><tr><td colspan="14" class="blank">暂无扫描记录</td></tr></tbody></table></div></section>
- <div class="foot">TMC Stock Take V1.3.1 · 本机模式仅存设备；登录云端后 ERP 与扫描数据存入 Supabase · 请定期导出 Excel/JSON 备份<br>本机模式数据不会自动同步到云端；云端模式必须联网，扫描保存失败时请重新扫描。</div>
+ <div class="foot">TMC Stock Take V1.3.2 · 本机模式仅存设备；登录云端后 ERP 与扫描数据存入 Supabase · 请定期导出 Excel/JSON 备份<br>本机模式数据不会自动同步到云端；云端模式必须联网，扫描保存失败时请重新扫描。旧版位置异常记录不会自动转为已盘点，需重新扫描或核查。</div>
 </main><div id="toast" class="toast" role="alert"></div>
 <script src="vendor/jszip.min.js"></script><script src="i18n.js"></script>
 <script src="cloud-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="cloud.js"></script><script src="app.js" defer></script>
+<script src="cloud.js"></script><script src="sound.js"></script><script src="app.js" defer></script>
 </body></html>

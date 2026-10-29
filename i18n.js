@@ -5,7 +5,36 @@ const KEY='tmc_stock_take_ui_lang_v1';
 let lang='zh';
 try{lang=localStorage.getItem(KEY)==='en'?'en':'zh';}catch(_){}
 const raw = [
-// V1.3.1 multiple actual locations
+['ERP × 实际位置（QR 仅供识别）','ERP × Actual Locations (QR for ID only)'],
+
+['扫码提示音 / Beep sound','Beep sound'],['♫ 试听 / Test','♫ Test Beep'],
+['已盘点标签','Counted Labels'],['QR 标签（仅参考）','QR Label (reference only)'],
+['QR 仓库和储位仅供记录，不参与比对','QR warehouse and rack are recorded for reference only, not compared'],
+['QR 标签旧仓库/储位仅作记录','Old QR warehouse/location recorded for reference'],
+['料号、批号符合 ERP，实物位置与 ERP 一致；QR 标签旧仓库/储位仅作记录','Part and lot match ERP, physical location matches. QR location is only a reference'],
+['已盘点·位置差异','Counted · Location Variance'],['已盘点·多储位','Counted · Multiple Racks'],
+['旧版位置差异·待复盘','Legacy Location Issue · Rescan'],
+['同料号及批号在 ERP 的多个储位均出现在实际位置清单中，无法确定该标签归属：','Part / Lot match several ERP rack rows in the actual group; cannot assign this label: '],
+['ERP 同料号/批号存在多个库存项目，实际位置未能唯一确定：','Multiple ERP rows have the same part and lot and cannot be uniquely identified from the physical location: '],
+['。请缩小实际储位范围后重扫。','. Confirm a specific actual location and rescan.'],
+['。请先核对再重扫。','. Verify then rescan.'],
+['ERP 仓库 ','ERP warehouse '],[' ≠ 实际仓库 ',' ≠ actual warehouse '],
+[' 与实际位置 ',' differs from actual locations '],[' 不一致',''],
+['；本张标签尚未指定唯一实际储位，重量只计一次','; exact physical rack is not assigned for this label; net weight counted once'],
+['✓ COUNTED · ERP 位置差异 / LOCATION VARIANCE','✓ COUNTED · ERP LOCATION VARIANCE'],
+['✓ COUNTED · 多储位待确认 / MULTIPLE LOCATIONS','✓ COUNTED · MULTIPLE LOCATIONS TO REVIEW'],
+['✓ COUNTED · 数量完成','✓ COUNTED · Quantity completed'],['✓ COUNTED · 已计入盘点','✓ COUNTED · Scan saved'],
+['⚠ COUNTED · 数量超出','⚠ COUNTED · Quantity exceeded'],
+['⚠ ERP 项目无法唯一对应','⚠ Ambiguous ERP record'],
+['；已计入盘点，储位调整请另行核查。','; counted, ERP location requires follow-up.'],
+['；已计入盘点，具体储位需人工核对。','; counted, exact physical rack requires verification.'],
+['实际记录多个储位：','Physical locations: '],
+['按 QR 的「料号 + 批号」识别 ERP 项目，重量每标签计一次；只比对 ERP 与实际位置。QR 标签的旧仓库/储位不参与匹配。实物已找到但有位置差异，仍计入已盘点并单独列出待调整。','Identify ERP by QR part and lot; count one weight per label. Compare only ERP versus actual location. QR warehouse and rack are historical references, not match criteria. Counted location differences are listed for ERP adjustment.'],
+['只比对 ','Only compare '],['ERP 仓库/储位','ERP warehouse / rack'],[' 与 ',' with '],['实际仓库/储位','actual warehouse / rack'],
+['。QR 标签仓库/储位可能是旧位置，仅保存作参考，不影响盘点计重。实际有多个储位时整组保存、重量只计一次，但不能自动指定到其中某一个储位。','. The QR warehouse and rack may be outdated, so they are recorded for reference and do not block counting. Multi-rack groups preserve the whole list and count weight once, without assigning it to one precise rack.'],
+['导入 ERP → 确认实际位置 → 扫描 QR（识别料号/批号/重量）→ ERP 与实际位置核查','Import ERP → Confirm actual location → Scan QR part/lot/weight → Compare ERP with actual'],
+
+// V1.3.2 location verification + scan sound
 ['实际储位 / Actual Racking No. (multiple allowed) *','Actual Racking No. (multiple allowed) *'],
 ['可同时输入多个实际储位，以逗号、分号或换行分隔。每张标签的净重只记一次。','Enter several actual rack locations separated by commas, semicolons or line breaks. Weight counts once per label.'],
 ['确认实际仓库及一个或多个占用储位；连续扫描时会保留整组储位','Confirm the warehouse and all occupied rack positions; consecutive scans retain the group'],
