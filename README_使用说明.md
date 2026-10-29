@@ -1,4 +1,25 @@
-# TMC Warehouse Stock Take V1.3.3 — ERP 多储位匹配修正版
+# TMC Stock Take V1.3.4 — Excel 盘点报告优化（Excel Export Fix）
+
+## 本次更新（与 V1.3.3 比较）
+
+1. **彩色状态**：在「↓ 导出 Excel」生成的 `.xlsx` 文件中，`Reconciliation` 工作表的 **状态 Status** 一栏会自动显示：完成 = 绿色、超出 = 红色、数量不足 = 黄色、未盘点 = 灰色。CSV 文件不支持单元格背景色，需要使用 `.xlsx` 查看彩色状态。
+2. **完整料号**：Excel 的 **料件編號 Part No.** 以「文字」类型写入，不会自动变成 `5.0078E+12`。CSV 中纯数字长料号使用 Excel 兼容的安全数字字符串表达式，直接用 Excel 打开时也显示完整号码；此表达式只包裹十位以上的纯数字，不执行任意外部公式。若以其他软件编辑 CSV，可能看到 `="5007801201001"`，属正常。请优先使用 `.xlsx`。
+3. **实际位置精确匹配**：`Actual Warehouse / Location (Exceptions)` 现在仅填写与这一 ERP 行 **仓库和储位都完全相同** 的已盘标签实际位置，如 `A001/2A1-01`。如实际储位清单为 `2A1, 2A1-01, 2A1-02, 2A1-03`，对应 ERP 行是 `A001/2A1-01`，该格只填 `A001/2A1-01`；若未发现完全匹配，则此格留空，供检查，其他实际位置仍保留在 `ScanHistory`、`LocationDetails` 和 `LocationVariance` 中。
+4. Excel 的 `Reconciliation` 工作表现在与 CSV 的十三列保持一致，包含 `Location Exception Labels` 和 `Actual Warehouse / Location (Exceptions)`。同一标签仍只计重一次。
+
+**注意**：只修改导出报表与其显示，不修改已保存的扫描记录、不改 ERP 库存、不改变云端 SQL 表结构。旧版本已经导出的 Excel/CSV 不会自动改变，请升级后重新点击导出。
+
+## 更新原网站
+
+1. 先备份现有盘点 Excel / JSON（使用云端模式还应备份 Supabase 数据）。
+2. 将 ZIP 解压后的所有文件上传到 `https://github.com/tmc-stock-take/tmc-stock-take.github.io` 根目录，覆盖旧版。保留 `vendor/jszip.min.js` 文件夹结构。
+3. 进入 GitHub → Actions，确认 GitHub Pages 部署成功。重新打开网页应显示 **V1.3.4**。
+4. 请点击绿色的 **↓ 导出 Excel** 来查看状态颜色；CSV 无法包含单元格颜色。
+5. 不需要重新运行 Supabase SQL 或重新导入 ERP；升级后重新导出报告即可。
+
+---
+
+# TMC Warehouse Stock Take V1.3.4 — ERP 多储位匹配修正版
 
 ## 核心修复：同料号、同批号、多个 ERP 储位
 
@@ -14,17 +35,17 @@
 
 1. 更新前备份现有盘点 JSON、Excel。云端模式请确认云端有数据库备份。
 2. 解压此包，将全部文件与 `vendor` 文件夹内容上传至 `tmc-stock-take.github.io` Repository 根目录（不是上传 ZIP 文件本身）。
-3. GitHub Actions 部署成功后，Chrome 刷新并确认页首 **V1.3.3**。若手机已安装 PWA，请关闭重新打开，不要清空网站储存。
+3. GitHub Actions 部署成功后，Chrome 刷新并确认页首 **V1.3.4**。若手机已安装 PWA，请关闭重新打开，不要清空网站储存。
 4. **此前 V1.3.2 的「ERP 项目无法唯一对应」未计重记录不会自动改成有效扫描**；请重新扫该张 QR，然后选择正确 ERP 行。
 5. 若 V1.3.2 的 Supabase 数据库已完成设置，本次没有新增状态或字段，无需再次执行 SQL。若尚未设置，请按压缩包中 Supabase 说明配置。
 
 > 工作提示：如果同料号和同批号在 ERP 多储位，重量一致也不能单独证明物料属哪笔 ERP；若现场不能确认，请先核查，勿随意选择。
 
-# TMC Warehouse Stock Take V1.3.3 — 取消 QR 位置比对 + 扫码提示音
+# TMC Warehouse Stock Take V1.3.4 — 取消 QR 位置比对 + 扫码提示音
 
 这是一份完整可部署到 GitHub Pages 的网页/PWA 程序，包含中文与英文、ERP Excel/CSV 导入、手机/扫码枪扫描、多个实际储位、ERP 与实际位置差异、Excel 报表，以及可选的 Supabase 电脑↔手机同步。
 
-## V1.3.3 核心规则
+## V1.3.4 核心规则
 
 1. 扫描 QR 标签，从中读取 **Label No.、Part No.、Lot No.、Net Weight (KG)** 进行物料识别和重量累计。原 QR 标签上的 **Warehouse 和 Location 完全不参与库存匹配及位置判断**，但保存在扫描历史作参考，不要求改标签。
 2. 以 **Part No. + Lot No.** 在 ERP 查找物料；如 ERP 有多笔相同料号/批号，先用实际仓库和实际位置锁定唯一 ERP 行。**如果无法唯一确认，标记 Ambiguous（待核对），不会胡乱计重**。
@@ -56,9 +77,9 @@
 ## 上传 GitHub Pages
 
 1. **升级前在旧版网页先下载 JSON 备份及 Excel**（本机模式）。不要清除 Chrome/Android 浏览器网站数据。
-2. 下载 V1.3.3 ZIP，解压后把网站文件及 `vendor` 文件夹上传覆盖到公司 Repository 根目录（`index.html` 必须在根目录）：https://github.com/tmc-stock-take/tmc-stock-take.github.io
+2. 下载 V1.3.4 ZIP，解压后把网站文件及 `vendor` 文件夹上传覆盖到公司 Repository 根目录（`index.html` 必须在根目录）：https://github.com/tmc-stock-take/tmc-stock-take.github.io
 3. GitHub → **Add file → Upload files → Commit changes**。确认 `sound.js` 同步上传。GitHub Pages 设置维持 **Deploy from a branch → main → /(root)**。
-4. 新版首次加载应出现 **V1.3.3**；手机如有旧版缓存，请关闭 App 后在 Chrome 刷新网页，或重新添加主屏幕快捷方式。勿清除网站数据。
+4. 新版首次加载应出现 **V1.3.4**；手机如有旧版缓存，请关闭 App 后在 Chrome 刷新网页，或重新添加主屏幕快捷方式。勿清除网站数据。
 
 ## Supabase 云端同步（重要：需更新 SQL）
 
@@ -74,6 +95,6 @@
 
 ## English quick guide
 
-V1.3.3 uses QR **Part No. + Lot No. + Net KG** to identify/count an item. QR warehouse/rack codes are *historical references only* and never used for matching. Count uniquely identifiable items even when ERP location differs, but add a **Location Variance** follow-up report; multiple actual rack locations are grouped without allocating/repeating weight. The new sound toggle plays a short beep for a successful scan and distinctive warning tones for duplicates or exceptions.
+V1.3.4 uses QR **Part No. + Lot No. + Net KG** to identify/count an item. QR warehouse/rack codes are *historical references only* and never used for matching. Count uniquely identifiable items even when ERP location differs, but add a **Location Variance** follow-up report; multiple actual rack locations are grouped without allocating/repeating weight. The new sound toggle plays a short beep for a successful scan and distinctive warning tones for duplicates or exceptions.
 
 For cloud mode, existing V1.3/V1.3.1 Supabase installations **must run `supabase_upgrade_v132.sql` in SQL Editor** before using new statuses. Real-device cloud synchronization requires your own Supabase credentials; only simulated cloud tests were run here.

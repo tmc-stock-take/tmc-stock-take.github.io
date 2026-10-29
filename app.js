@@ -1,4 +1,4 @@
-/* TMC Stock Take V1.3.3: ERP multi-row resolver, multi-location scan, optional cloud */
+/* TMC Stock Take V1.3.4: color-coded exports, text IDs, matching actual rack per ERP row */
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);
@@ -31,7 +31,7 @@ function expandScientific(s){s=String(s??'').trim();let m=s.match(/^([+-]?)(\d+)
   if(p>=digits.length)return sign+digits+'0'.repeat(p-digits.length);
   return sign+digits.slice(0,p)+'.'+digits.slice(p);
 }
-function cleanCode(s){return expandScientific(s).normalize('NFKC').trim().replace(/^['“”]+|['“”]+$/g,'').replace(/\s+/g,'').toUpperCase()}
+function cleanCode(s){return expandScientific(String(s??'').trim().replace(/^="(\d+)"$/,'$1')).normalize('NFKC').trim().replace(/^['“”]+|['“”]+$/g,'').replace(/\s+/g,'').toUpperCase()}
 function cleanLabel(s){return cleanCode(s).replace(/^(?:NO\.?|LABEL(?:NO\.?)?[:：]?)\s*/i,'').replace(/\D/g,'') || cleanCode(s)}
 // A physical label may span several ACTUAL rack positions. Keep each distinct,
 // use exact codes only (2A1 never implicitly matches 2A1-01), and never multiply its weight.
@@ -355,23 +355,51 @@ function render(){const sums=scannedSum(),total=state.inventory.length,items=sta
 }
 function revokeUrl(blob,name){let url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000)}
 function exportRows(){const sums=scannedSum();return state.inventory.map(r=>{let s=sums.get(keyOf(r))||{sum:0,count:0},diff=round3(s.sum-r.quantity);return {...r,scanned:s.sum,difference:diff,count:s.count,status:classify(r,s.sum)}})}
-function csvCell(v){let s=String(v??'');if(/^[=+@\t\r]/.test(s)||s.startsWith('-')&&!/^-\d+(?:\.\d+)?$/.test(s))s="'"+s;return /[",\r\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
+function csvCell(v){let s=String(v??'');if(!/^="\d{10,}"$/.test(s)&&(/^[=+@\t\r]/.test(s)||s.startsWith('-')&&!/^-\d+(?:\.\d+)?$/.test(s)))s="'"+s;return /[",\r\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
+// Reconciliation is per ERP row. Only a SCANNED label whose actual warehouse
+// AND one of its actual rack codes exactly match this ERP row may populate the
+// matched-position field. Do not copy an entire multi-rack group into each row.
+function matchedActualPosition(r,history){
+ const wh=cleanCode(r.warehouse),loc=cleanCode(r.location);
+ const matches=history.filter(h=>isCounted(h)&&cleanCode(h.part)===cleanCode(r.part)&&cleanCode(h.lot)===cleanCode(r.lot)
+   &&cleanCode(h.erpWarehouse)===wh&&cleanCode(h.erpLocation)===loc&&cleanCode(h.actualWarehouse)===wh
+   &&parseActualLocations(h.actualLocations?.length?h.actualLocations:h.actualLocation||'').includes(loc));
+ return matches.length?wh+'/'+loc:'';
+}
+function locationExceptionCount(r,history){
+ return history.filter(h=>cleanCode(h.part)===cleanCode(r.part)&&cleanCode(h.lot)===cleanCode(r.lot)
+   &&cleanCode(h.erpWarehouse)===cleanCode(r.warehouse)&&cleanCode(h.erpLocation)===cleanCode(r.location)
+   &&['counted_variance','counted_multi','mismatch'].includes(h.status)).length;
+}
+// Excel automatically turns long all-numeric CSV fields into scientific
+// notation. The formula contains ONLY validated digits and evaluates to text
+// when opening the CSV directly in Excel; true XLSX exports use text cells.
+function csvTextId(value){const s=String(value??'');return /^\d{10,}$/.test(s)?'="'+s+'"':s}
 function exportCsv(){if(!state.inventory.length){msg('请先导入 ERP 报表');return}
  let head=['状态 Status','料件編號 Part No.','品名 Description','規格 Spec','倉庫 Warehouse','儲位 Location','批號 Lot','ERP Qty (KG)','Scanned Qty (KG)','Variance (KG)','Scanned Labels','Location Exception Labels','Actual Warehouse / Location (Exceptions)'];
- let rows=exportRows().map(r=>{
-  const anomalies=state.history.filter(h=>h.part===r.part&&h.lot===r.lot&&['counted_variance','counted_multi','mismatch'].includes(h.status)&&(h.erpWarehouse===r.warehouse&&h.erpLocation===r.location));
-  return [statusInfo(r.status)[0],r.part,r.name,r.spec,r.warehouse,r.location,r.lot,displayNumber(r.quantity),displayNumber(r.scanned),displayNumber(r.difference),r.count,anomalies.length,[...new Set(anomalies.map(h=>(h.actualWarehouse||'')+'/'+(h.actualLocation||'')))].join('; ')];
- });
+ let history=state.history;
+ let rows=exportRows().map(r=>[
+  statusInfo(r.status)[0],csvTextId(r.part),r.name,r.spec,r.warehouse,r.location,r.lot,
+  displayNumber(r.quantity),displayNumber(r.scanned),displayNumber(r.difference),r.count,
+  locationExceptionCount(r,history),matchedActualPosition(r,history)
+ ]);
  let content='\uFEFF'+[head,...rows].map(r=>r.map(csvCell).join(',')).join('\r\n');
- revokeUrl(new Blob([content],{type:'text/csv;charset=utf-8'}),'TMC_Stock_Take_'+stamp()+'.csv');msg('已导出 CSV，比对资料包含所有库存项目');
+ revokeUrl(new Blob([content],{type:'text/csv;charset=utf-8'}),'TMC_Stock_Take_'+stamp()+'.csv');
+ msg('已导出 CSV：料号保留完整数字；Excel 彩色状态请使用「导出 Excel」');
 }
 function xesc(v){return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;')}
 function excelCol(i){let s='';for(i++;i;i=Math.floor((i-1)/26))s=String.fromCharCode(65+(i-1)%26)+s;return s}
-function sheetXML(data,widths){let cols=widths.map((w,i)=>'<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+w+'" customWidth="1"/>').join('');
+// XLSX styles: 0 normal, 1 header, 2 numeric, 3 plain-text ID,
+// 4 completed/green, 5 over/red, 6 short/amber, 7 not-counted/gray.
+function sheetXML(data,widths,opts={}){
+ let cols=widths.map((w,i)=>'<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+w+'" customWidth="1"/>').join('');
+ const textCols=new Set(opts.textColumns||[]);
+ const statusStyles={done:4,over:5,short:6,pending:7};
  let rows=data.map((row,ri)=>'<row r="'+(ri+1)+'"'+(ri===0?' ht="28" customHeight="1"':'')+'>'+row.map((v,ci)=>{
-  let ref=excelCol(ci)+(ri+1);if(v===null||v===undefined||v==='')return'';
-  if(typeof v==='number'&&Number.isFinite(v))return '<c r="'+ref+'" s="2"><v>'+v+'</v></c>';
-  return '<c r="'+ref+'" s="'+(ri===0?'1':'0')+'" t="inlineStr"><is><t xml:space="preserve">'+xesc(v)+'</t></is></c>'
+  let ref=excelCol(ci)+(ri+1);if(v===null||v===undefined||v==='')return '';
+  if(ri>0&&typeof v==='number'&&Number.isFinite(v)&&!textCols.has(ci))return '<c r="'+ref+'" s="2"><v>'+v+'</v></c>';
+  let style=ri===0?1:(ci===0&&opts.statusKeys?statusStyles[opts.statusKeys[ri-1]]??0:textCols.has(ci)?3:0);
+  return '<c r="'+ref+'" s="'+style+'" t="inlineStr"><is><t xml:space="preserve">'+xesc(v)+'</t></is></c>';
  }).join('')+'</row>').join('');
  let filter=data.length>1?'<autoFilter ref="A1:'+excelCol(data[0].length-1)+data.length+'"/>':'';
  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="16"/><cols>'+cols+'</cols><sheetData>'+rows+'</sheetData>'+filter+'</worksheet>';
@@ -381,7 +409,7 @@ async function exportExcel(){if(!state.inventory.length){msg('请先导入 ERP �
  const rows=exportRows(),history=state.history;
  const counts={done:rows.filter(r=>r.status==='done').length,pending:rows.filter(r=>r.status==='pending').length,short:rows.filter(r=>r.status==='short').length,over:rows.filter(r=>r.status==='over').length};
  const summary=[['Stock Take Summary','Value'],['ERP file',state.reportName],['Import time',state.importedAt],['Export time',now()],['ERP inventory lines',rows.length],['Completed',counts.done],['Not yet counted',counts.pending],['Quantity short',counts.short],['Over quantity',counts.over],['Counted scans (incl. location variance)',history.filter(isCounted).length],['Records requiring review',history.filter(h=>h.status!=='accepted').length],['Counted location variances',history.filter(h=>h.status==='counted_variance').length],['Counted multi-location groups',history.filter(h=>h.status==='counted_multi').length],['Ambiguous ERP row',history.filter(h=>h.status==='ambiguous').length],['V1.0 legacy scans requiring recheck',history.filter(h=>h.status==='legacy').length],['Quantity tolerance (kg)',TOLERANCE],['Source',window.TMCCloud?.isActive()?'Supabase cloud':'Local browser data'],['Multiple actual rack groups',history.filter(h=>h.actualLocations?.length>1&&h.status!=='duplicate').length],['Note','For multi-rack labels, Net KG is counted ONCE per label, NOT repeated per rack.']];
- const rec=[['Status','Part No.','Description','Specification','Warehouse','Location','Lot No.','ERP Qty (KG)','Scanned Qty (KG)','Difference (KG)','Label Count','Unit'],...rows.map(r=>[statusInfo(r.status)[0],r.part,r.name,r.spec,r.warehouse,r.location,r.lot,r.quantity,r.scanned,r.difference,r.count,r.unit])];
+ const rec=[['状态 Status','料件編號 Part No.','品名 Description','規格 Spec','倉庫 Warehouse','儲位 Location','批號 Lot','ERP Qty (KG)','Scanned Qty (KG)','Variance (KG)','Scanned Labels','Location Exception Labels','Actual Warehouse / Location (Exceptions)'],...rows.map(r=>[statusInfo(r.status)[0],r.part,r.name,r.spec,r.warehouse,r.location,r.lot,r.quantity,r.scanned,r.difference,r.count,locationExceptionCount(r,history),matchedActualPosition(r,history)])];
  const scan=[['Scanned At','Status','Label No.','Part No.','Lot No.','QR Warehouse (reference)','QR Location (reference)','Actual Warehouse','Actual Locations (all)','ERP Warehouse','ERP Location','ERP in Actual','QR location not compared','Additional Locations','Net Weight (KG)','Reason','Raw QR'],...history.map(h=>[h.at,statusInfo(h.status)[0],h.label||'',h.part||'',h.lot||'',h.warehouse||'',h.location||'',h.actualWarehouse||'',h.actualLocation||'',h.erpWarehouse||'',h.erpLocation||'',h.positionChecks?(h.positionChecks.erpInActual?'YES':'NO'):'','NOT COMPARED',h.positionChecks?.extraLocations?.join(', ')||'',Number.isFinite(h.weight)?h.weight:'',tr(h.message||''),h.raw||''])];
  const exception=[['Type','Scan Time','Label No.','Part No.','Lot No.','QR Warehouse (reference)','QR Location (reference)','Actual Warehouse','Actual Locations (all)','ERP Warehouse','ERP Location','ERP in Actual','QR location not compared','Additional Locations','Net Weight (KG)','Note'],...history.filter(h=>h.status!=='accepted').map(h=>[statusInfo(h.status)[0],h.at,h.label||'',h.part||'',h.lot||'',h.warehouse||'',h.location||'',h.actualWarehouse||'',h.actualLocation||'',h.erpWarehouse||'',h.erpLocation||'',h.positionChecks?(h.positionChecks.erpInActual?'YES':'NO'):'','NOT COMPARED',h.positionChecks?.extraLocations?.join(', ')||'',Number.isFinite(h.weight)?h.weight:'',tr(h.message||'')])];
  const actualSummary=[['Actual Warehouse','Actual Racking No. (group, not split weight)','Part No.','Lot No.','Labels Scanned','Physical Weight (KG)','Counted Weight (KG)','Exception Weight (KG)','Statuses'],...(()=>{
@@ -396,15 +424,15 @@ async function exportExcel(){if(!state.inventory.length){msg('请先导入 ERP �
      h.at||'',h.label||'',h.part||'',h.lot||'',h.actualWarehouse,loc,(h.actualWarehouse===h.erpWarehouse&&loc===h.erpLocation)?'YES':'NO','NOT COMPARED',statusInfo(h.status)[0],'Location reference only. Net KG is NOT allocated to each rack.'
    ]))];
   const locationVariance=[['Scanned At','Label No.','Part No.','Lot No.','ERP Warehouse','ERP Location','Actual Warehouse','Actual Rack Group','Location Finding','Counted Weight (KG)','Follow-up'],...history.filter(h=>['counted_variance','counted_multi'].includes(h.status)).map(h=>[h.at,h.label||'',h.part||'',h.lot||'',h.erpWarehouse||'',h.erpLocation||'',h.actualWarehouse||'',h.actualLocation||'',statusInfo(h.status)[0],Number.isFinite(h.weight)?h.weight:'',tr(h.message||'')])];
- const sheets=[['LocationVariance',locationVariance,[24,18,23,22,21,21,21,45,28,24,80]],['Summary',summary,[29,53]],['Reconciliation',rec,[16,20,43,20,15,18,19,18,20,20,16,12]],['ScanHistory',scan,[23,17,17,21,19,16,18,18,35,18,18,17,17,31,19,60,65]],['Exceptions',exception,[18,24,17,21,19,18,18,18,35,18,18,17,17,31,20,72]],['ActualLocations',actualSummary,[21,44,21,19,19,21,26,25,30]],['LocationDetails',locationsDetail,[22,17,21,18,20,26,22,22,18,66]]];
+ const sheets=[['LocationVariance',locationVariance,[24,18,23,22,21,21,21,45,28,24,80],{textColumns:[2,3]}],['Summary',summary,[29,53]],['Reconciliation',rec,[17,23,43,40,16,18,22,18,20,20,16,20,38],{textColumns:[1,6],statusKeys:rows.map(r=>r.status)}],['ScanHistory',scan,[23,17,17,21,19,16,18,18,35,18,18,17,17,31,19,60,65],{textColumns:[2,3,4]}],['Exceptions',exception,[18,24,17,21,19,18,18,18,35,18,18,17,17,31,20,72],{textColumns:[2,3,4]}],['ActualLocations',actualSummary,[21,44,21,19,19,21,26,25,30],{textColumns:[2,3]}],['LocationDetails',locationsDetail,[22,17,21,18,20,26,22,22,18,66],{textColumns:[1,2,3]}]];
  const zip=new JSZip();
  zip.file('[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'+sheets.map((_,i)=>'<Override PartName="/xl/worksheets/sheet'+(i+1)+'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join('')+'</Types>');
  zip.file('_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
  zip.file('xl/workbook.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView/></bookViews><sheets>'+sheets.map(([name],i)=>'<sheet name="'+xesc(name)+'" sheetId="'+(i+1)+'" r:id="rId'+(i+1)+'"/>').join('')+'</sheets></workbook>');
  zip.file('xl/_rels/workbook.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+sheets.map((_,i)=>'<Relationship Id="rId'+(i+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet'+(i+1)+'.xml"/>').join('')+'<Relationship Id="rId'+(sheets.length+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>');
- zip.file('xl/styles.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Aptos"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Aptos"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF123454"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="2" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>');
- sheets.forEach(([,data,widths],i)=>zip.file('xl/worksheets/sheet'+(i+1)+'.xml',sheetXML(data,widths)));
- revokeUrl(await zip.generateAsync({type:'blob',compression:'DEFLATE'}),'TMC_Stock_Take_'+stamp()+'.xlsx');msg('已导出 Excel：含盘点重量、ERP 储位差异、扫码记录与实际储位汇总');
+ zip.file('xl/styles.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="6"><font><sz val="11"/><name val="Aptos"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Aptos"/></font><font><b/><sz val="11"/><color rgb="FF076B4C"/><name val="Aptos"/></font><font><b/><sz val="11"/><color rgb="FFAE1B35"/><name val="Aptos"/></font><font><b/><sz val="11"/><color rgb="FF8B590C"/><name val="Aptos"/></font><font><sz val="11"/><color rgb="FF64748B"/><name val="Aptos"/></font></fonts><fills count="7"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF123454"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFDCFCE7"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFE2E5"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF0C9"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF0F3F8"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="8"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="2" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="49" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="0" fontId="3" fillId="4" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="0" fontId="4" fillId="5" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="0" fontId="5" fillId="6" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>');
+ sheets.forEach(([,data,widths,opts],i)=>zip.file('xl/worksheets/sheet'+(i+1)+'.xml',sheetXML(data,widths,opts)));
+ revokeUrl(await zip.generateAsync({type:'blob',compression:'DEFLATE'}),'TMC_Stock_Take_'+stamp()+'.xlsx');msg('已导出 Excel：完成绿色、超出红色、完整料号、各行匹配实际储位');
  }catch(e){console.error(e);msg('Excel 导出失败：'+e.message)}
 }
 function exportJson(){revokeUrl(new Blob([JSON.stringify({version:2,exportedAt:now(),state},null,2)],{type:'application/json'}),'TMC_StockTake_Backup_'+stamp()+'.json');msg('JSON 备份已下载')}

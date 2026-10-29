@@ -1,4 +1,4 @@
-const CACHE='tmc-stocktake-v1-3-3-erprow-picker-20261029';
+const CACHE='tmc-stocktake-v1-3-4-export-styles-20261029';
 const ASSETS=['./','./index.html','./app.js','./sound.js','./i18n.js','./cloud.js','./cloud-config.js','./icon-192.png','./icon-512.png','./icon-maskable-512.png','./apple-touch-icon.png','./favicon-64.png','./manifest.webmanifest','./vendor/jszip.min.js'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
