@@ -1,4 +1,4 @@
-/* Stock Take V1.3.6: bilingual UI. UI translations never modify inventory or scan data. */
+/* Stock Take V1.3.7: bilingual UI. UI translations never modify inventory or scan data. */
 (function(){
 'use strict';
 const KEY='tmc_stock_take_ui_lang_v1';
@@ -6,11 +6,11 @@ let lang='zh';
 try{lang=localStorage.getItem(KEY)==='en'?'en':'zh';}catch(_){}
 const raw = [
 
-// V1.3.6 separated page navigation
+// V1.3.7 scan-page inventory metrics
 ['云端同步','Cloud Sync'],['ERP 导入','ERP Import'],['扫码盘点','Scan & Count'],['扫描记录','Scan History'],['声音设置','Sound Settings'],
 ['云端连接与账号','Cloud Connection & Account'],['电脑与手机共用盘点数据','Share stock take data across PC and phone'],
-['ERP 导入与实际位置','ERP Import & Actual Locations'],['导入报表、设置实际储位并查看盘点进度','Import ERP, confirm actual locations and review progress'],
-['扫码与 ERP 盘点比对','Scan & ERP Reconciliation'],['扫描 QR 并立即核对 ERP 数量','Scan QR labels and reconcile ERP quantities'],
+['ERP 导入与实际位置','ERP Import & Actual Locations'],['导入报表、设置实际储位并导出报表','Import ERP, confirm actual locations and export reports'],
+['扫码与 ERP 盘点比对','Scan & ERP Reconciliation'],['扫描 QR 并实时查看盘点进度与 ERP 数量','Scan QR labels and view inventory progress in real time'],
 ['查看标签记录与异常，必要时删除错误扫描','Review scan history and exceptions; delete incorrect scans if needed'],
 ['扫码声音设置','Scan Beep Settings'],['调整扫描提示音、音效与音量','Adjust scan alert style and volume'],
 ['盘点资料管理 / Inventory Data','Inventory Data Management'],['导入 ERP、导出 Excel/CSV、备份与恢复盘点资料。','Import ERP, export Excel/CSV and manage JSON backups.'],

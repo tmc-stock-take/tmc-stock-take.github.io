@@ -1,4 +1,4 @@
-/* TMC Stock Take V1.3.6 - responsive navigation, UI only */
+/* TMC Stock Take V1.3.7 - responsive navigation, UI only */
 (()=>{
  'use strict';
  const KEY='tmc_stock_take_page_v136';

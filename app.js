@@ -1,4 +1,4 @@
-/* TMC Stock Take V1.3.6: standard OOXML download (.xlsx) with correct MIME + sound selection */
+/* TMC Stock Take V1.3.7: standard OOXML download (.xlsx) with correct MIME + sound selection */
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);

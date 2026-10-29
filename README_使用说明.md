@@ -1,11 +1,21 @@
-# TMC Warehouse Stock Take V1.3.6 — 分页面导航版 / Multi-Page Navigation
+# TMC Warehouse Stock Take V1.3.7 — 分页面导航版 / Multi-Page Navigation
+
+
+## V1.3.7 更新：盘点统计移到「扫码盘点」页面
+
+- 五张盘点统计卡片（ERP 库存项目、已完成盘点、待盘点/数量不足、异常/数量超出、已盘点标签）由「ERP 导入」页面**移到「扫码盘点」页面的顶部**。
+- 「扫码盘点」页面现在依次显示：**盘点统计 → QR 扫描 → ERP 盘点比对**。
+- 「ERP 导入」页面保留报表上传、实际位置设置、Excel/CSV 导出和备份。
+- 统计数字由原来的计算逻辑自动更新，不新增或修改盘点数据；手机显示为两列卡片，电脑显示为一行五列。
+- 保留 V1.3.6 所有扫码、声音、Excel、中文/英文和 Supabase 云端同步功能，**数据库无需升级**。
+- 使用前建议先备份 JSON；更新网站文件后查看页面显示 **V1.3.7**。
 
 ## 新版布局
 
-V1.3.6 将之前同一长页面拆成 5 个单独页面，用顶部导航（电脑）或固定底部导航（手机）切换：
+V1.3.7 将之前同一长页面拆成 5 个单独页面，用顶部导航（电脑）或固定底部导航（手机）切换：
 
 1. **云端同步 / Cloud Sync**：Supabase 连接、登录和刷新。
-2. **ERP 导入 / ERP Import**：ERP Excel/CSV 上传、栏位对应、实际仓库与储位、库存统计、Excel/CSV 下载、JSON 备份及恢复。
+2. **ERP 导入 / ERP Import**：ERP Excel/CSV 上传、栏位对应、实际仓库与储位、Excel/CSV 下载、JSON 备份及恢复。
 3. **扫码盘点 / Scan & Count**：二维码相机/扫描枪/照片/手动输入、扫描结果和 ERP 盘点比对放在同一个画面。
 4. **扫描记录 / Scan History**：扫描历史、过滤和单笔删除。
 5. **声音设置 / Sound Settings**：扫码声音开关、3 种音效、音量和试听。
@@ -15,8 +25,8 @@ V1.3.6 将之前同一长页面拆成 5 个单独页面，用顶部导航（电�
 ## 更新 GitHub Pages
 
 1. 先在原站导出 JSON 和 Excel 备份，尤其使用真实云端数据时请有数据库备份。
-2. 解压 V1.3.6 ZIP，把**所有内容**上传到原 `tmc-stock-take.github.io` Repository 根目录，覆盖同名文件，**必须包含新增 `tabs.js`**。保留 `vendor` 目录及其他云端配置文件。
-3. Commit changes，进入 GitHub → Actions 查看 Pages 部署成功。手机刷新或关闭再打开 App，确认顶部是 **V1.3.6**。
+2. 解压 V1.3.7 ZIP，把**所有内容**上传到原 `tmc-stock-take.github.io` Repository 根目录，覆盖同名文件，**必须包含新增 `tabs.js`**。保留 `vendor` 目录及其他云端配置文件。
+3. Commit changes，进入 GitHub → Actions 查看 Pages 部署成功。手机刷新或关闭再打开 App，确认顶部是 **V1.3.7**。
 4. 如果仍显示旧界面，清理单个站点缓存前务必备份数据；一般可先强制刷新或等 Service Worker 更新，**不要删除 Chrome 网站存储**。
 
 **云端同步**仍需要项目 URL、可公开的 publishable key 和数据库配置，单纯部署 GitHub Pages 不会自行开启同步。此版无需新 SQL。
