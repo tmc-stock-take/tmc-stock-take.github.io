@@ -53,6 +53,12 @@
     .actual-position{margin-top:18px;margin-bottom:0;border-color:#b9d4ee;background:linear-gradient(110deg,#fff 70%,#f5faff);padding:14px}
     .position-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end}.position-actions{grid-column:1/-1}
     .position-grid .field-label{margin-top:0}
+    .position-grid textarea{display:block;box-sizing:border-box;width:100%;border:1px solid #ccd8e5;border-radius:9px;resize:vertical;padding:10px 11px;color:#1c3551;font:inherit;line-height:1.5;min-height:65px;outline:none}
+    .position-grid textarea:focus{border-color:#368fcf;box-shadow:0 0 0 3px #348ccf18}
+    .multi-hint{font-size:11px;color:#6a7d91;line-height:1.5;margin-top:5px}
+    .location-chip{display:inline-block;border-radius:8px;padding:4px 7px;margin:2px 1px;font-size:12px;font-weight:700;white-space:nowrap}
+    .erp-chip{background:#e1f7ee;color:#066f55}.qr-chip{background:#e9f3ff;color:#2168a7}.extra-chip{background:#fff1dd;color:#9d6011}
+    .position-flags{display:flex;gap:6px;flex-wrap:wrap;margin:9px 0 0}.position-flags span{padding:5px 8px;border-radius:7px;font-size:12px;font-weight:650}.flag-yes{color:#076954;background:#e6f7ed}.flag-no{color:#9e3442;background:#ffeaed}
     .position-notice{padding:11px 12px;margin-top:12px;background:#edf5fd;color:#315c83;border-radius:10px;font-size:13px;line-height:1.55}
     .position-notice.active{background:#e8f9f3;color:#0b7b64}.position-notice.dirty{background:#fff4dd;color:#966019}
     .comparison-panel{margin-top:12px;border:1px solid #d8e3ed;border-radius:11px;padding:12px;background:#fafcfe}
@@ -61,12 +67,50 @@
     .comparison-panel .comparison-detail{margin-top:8px;font-size:12px;line-height:1.6;color:#526880}
     @media(max-width:650px){.position-grid{grid-template-columns:1fr 1fr;gap:10px}.actual-position .section-head{margin-bottom:12px}}
     @media(max-width:380px){.position-grid{grid-template-columns:1fr}.position-actions{grid-column:auto}}
+
+    /* V1.3 realtime cloud connection controls */
+    [hidden]{display:none!important}
+    .cloud-card{border:1px solid #a9cfe9;background:linear-gradient(105deg,#f8fcff,#ebf6ff);padding:18px;margin-bottom:17px}
+    .cloud-title{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+    .cloud-title h2{margin-right:auto}
+    .cloud-status{background:#e9eff7;border-radius:9px;font-size:12px;padding:9px 11px;color:#446178;line-height:1.5;margin:10px 0}
+    .cloud-online{background:#dff8ee;color:#087751}.cloud-bad{background:#fff0f1;color:#b92b3f}
+    .cloud-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end}
+    .cloud-fields .field-label{margin-top:5px}.cloud-fields input[type=password],.cloud-fields input[type=email],.cloud-fields input[type=url]{width:100%;min-width:0;min-height:41px;border:1px solid #ccd8e5;border-radius:9px;padding:10px 11px}
+    .cloud-details{line-height:1.55;font-size:12px;color:#47637e}
+    .cloud-account-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    @media(max-width:700px){.cloud-fields{grid-template-columns:1fr}.cloud-card{padding:13px}}
   </style>
 </head>
 <body>
-<header class="topbar"><div class="brand"><img src="icon-192.png" alt="TMC Stock Take"><div><strong>TMC STOCK TAKE</strong><small>Three-Way Stock Take · V1.2</small></div></div><div class="toplinks"><label class="lang-wrap" for="languageSelect"><span>🌐</span><select id="languageSelect" aria-label="Language / 语言"><option value="zh">中文</option><option value="en">English</option></select></label><span class="version">LOCAL DATA · GITHUB PAGES READY</span><button class="btn small-btn" id="installBtn" hidden>⬇ 安装 App</button></div></header>
+<header class="topbar"><div class="brand"><img src="icon-192.png" alt="TMC Stock Take"><div><strong>TMC STOCK TAKE</strong><small>Three-Way Stock Take · V1.3.1</small></div></div><div class="toplinks"><label class="lang-wrap" for="languageSelect"><span>🌐</span><select id="languageSelect" aria-label="Language / 语言"><option value="zh">中文</option><option value="en">English</option></select></label><span class="version">LOCAL / CLOUD SYNC</span><button class="btn small-btn" id="installBtn" hidden>⬇ 安装 App</button></div></header>
 <main class="wrap">
  <div class="headrow"><div><h1>仓库库存盘点 <span class="muted">/ Stock Take</span></h1><div class="muted">导入 ERP 报表 → 设置实际盘点位置 → 扫描标签 QR → 三方自动比对</div></div><div class="buttons"><button id="exportExcel" class="btn green">↓ 导出 Excel</button><button id="exportCsv" class="btn">↓ 导出 CSV</button><button id="resetAll" class="btn danger">清空盘点</button></div></div>
+
+ <section class="card cloud-card" id="cloudSection" aria-label="Cloud Sync / 云端同步">
+  <div class="cloud-title"><h2>☁ 电脑 ↔ 手机实时同步 / PC ↔ Phone Live Sync</h2><button type="button" id="cloudReconfigure" class="btn small-btn">⚙ 配置 / Setup</button><button type="button" id="cloudRefreshBtn" class="btn small-btn" disabled>↻ 刷新 / Refresh</button></div>
+  <div id="cloudStatus" class="cloud-status" role="status">本机模式 / Local Mode</div>
+  <div id="cloudConfigPanel">
+    <div class="cloud-details">首次连接：建立 Supabase 项目、运行附带 SQL，填写 Project URL + Publishable Key。此网页不可使用 secret/service_role key。<br>First-time setup: create a Supabase project, run the supplied SQL, then enter Project URL and public publishable key. Never use a secret/service_role key.</div>
+    <div class="cloud-fields">
+      <div><label class="field-label" for="cloudUrl">Supabase Project URL</label><input type="url" id="cloudUrl" placeholder="https://your-project.supabase.co" autocomplete="off"></div>
+      <div><label class="field-label" for="cloudKey">Publishable / anon key (public)</label><input type="text" id="cloudKey" autocomplete="off" placeholder="sb_publishable_..." spellcheck="false"></div>
+    </div><div class="buttons" style="margin-top:10px"><button class="btn primary" id="cloudSaveConfig">连接云端 / Connect</button></div>
+  </div>
+  <div id="cloudAuthPanel" hidden>
+    <div class="cloud-details">电脑和手机请使用 <b>同一个邮箱账号</b> 登录，才能看到同一份 ERP 与扫描记录。<br>Sign in with the <b>same email account</b> on PC and phone.</div>
+    <div class="cloud-fields">
+      <div><label class="field-label" for="cloudEmail">Email / 邮箱</label><input type="email" id="cloudEmail" autocomplete="username" placeholder="name@company.com"></div>
+      <div><label class="field-label" for="cloudPassword">Password / 密码（至少 8 位）</label><input type="password" id="cloudPassword" autocomplete="current-password" placeholder="Password / 密码"></div>
+    </div>
+    <div class="buttons" style="margin-top:11px"><button id="cloudLogin" class="btn primary">登录 / Sign In</button><button id="cloudRegister" class="btn">注册 / Sign Up</button></div>
+    <div class="cloud-details" style="margin-top:8px">注册后如需邮箱验证，请先确认邮件，再登录。If confirmation email is required, verify it first.</div>
+  </div>
+  <div id="cloudAccountPanel" hidden>
+    <div class="cloud-account-line"><span class="pill ok">● CLOUD</span><b id="cloudUser"></b><button id="cloudSignOut" class="btn small-btn">退出云端 / Sign Out</button></div>
+  </div>
+  <div id="cloudInfoPanel" class="cloud-details" hidden style="margin-top:9px">📦 <b id="cloudBatch">—</b> <span>· 云端数据可在已登录设备之间同步；网络不可用时不会保存扫描。 / Data syncs across signed-in devices; scans do not save while offline.</span></div>
+ </section>
  <section class="metrics" aria-label="盘点总览">
   <div class="card"><div class="metric-label">ERP 库存项目</div><div id="countTotal" class="metric-value">0</div><div class="metric-note">Unique inventory lines</div></div>
   <div class="card"><div class="metric-label">已完成盘点</div><div id="countDone" class="metric-value green-text">0</div><div class="metric-note">Matched quantity</div></div>
@@ -81,16 +125,16 @@
    <div id="mappingPanel" class="mapping"><h3>确认报表栏位对应 / Column Mapping</h3><p id="mappingInfo" class="muted">自动辨识后可以自行调整</p><div id="mappingFields" class="map-grid"></div><div id="mappingPreview" class="mapping-preview"></div><div class="buttons"><button id="confirmImport" class="btn primary">确认导入报表</button><button id="cancelImport" class="btn">取消</button></div></div>
    <div id="reportInfo" class="reportinfo"><span class="muted">尚未导入报表</span></div>
    <div class="progress"><div id="progressFill"></div></div><div id="progressLabel" class="muted small">完成率 0%</div>
-   <div class="tip">先匹配「料号 + 批号」，再将 ERP、QR 标签和实际盘点仓库 / 储位三方核对。只有三方一致的标签会累计重量；无法唯一确认 ERP 项目时会显示异常，不会随意分配给某个储位。</div>
+   <div class="tip">先匹配「料号 + 批号」，再将 ERP、QR 标签和实际盘点仓库 / 储位三方核对。只有三方一致且实际位置唯一的标签会累计重量；多实际储位会单独记录并提示核对，不会拆分或重复计算标签重量。</div>
  <section class="card actual-position" aria-label="实盘位置">
-   <div class="section-head"><div><h2>② 设置实际盘点位置 <span class="muted">/ Actual Stock Location</span></h2><p class="muted">先确认目前站在哪个仓库和货架，再连续扫描该位置的物料标签</p></div><div id="activePositionBadge" class="pill wait">尚未设置</div></div>
+   <div class="section-head"><div><h2>② 设置实际盘点位置 <span class="muted">/ Actual Stock Location</span></h2><p class="muted">确认实际仓库及一个或多个占用储位；连续扫描时会保留整组储位</p></div><div id="activePositionBadge" class="pill wait">尚未设置</div></div>
    <div class="position-grid">
     <div><label class="field-label" for="actualWarehouse">实际仓库 / Actual Warehouse *</label><input type="text" id="actualWarehouse" list="warehouseOptions" autocomplete="off" autocapitalize="characters" placeholder="例如 L002"><datalist id="warehouseOptions"></datalist></div>
-    <div><label class="field-label" for="actualLocation">实际储位 / Actual Racking No. *</label><input type="text" id="actualLocation" autocomplete="off" autocapitalize="characters" placeholder="例如 3A1-113"></div>
+    <div><label class="field-label" for="actualLocation">实际储位 / Actual Racking No. (multiple allowed) *</label><textarea id="actualLocation" rows="2" autocomplete="off" autocapitalize="characters" placeholder="例如 2A1, 2A1-01, 2A1-02"></textarea><div class="multi-hint">可同时输入多个实际储位，以逗号、分号或换行分隔。每张标签的净重只记一次。<br>Enter several actual locations separated by commas, semicolons or new lines. A label’s weight counts once.</div></div>
     <div class="position-actions"><button id="confirmPosition" class="btn primary fullwidth">✓ 确认当前盘点位置</button></div>
    </div>
-   <div id="positionNotice" class="position-notice">未确认实际位置之前，无法扫描标签。确认后会持续沿用，直到你更换储位。</div>
-   <div class="tip">比对三个来源：<b>ERP 报表位置</b>、<b>标签 QR 位置</b>、<b>仓库人员确认的实际位置</b>。三方全部相符才计算有效盘点重量。任何位置不一致都会存入异常记录，不会自动修改 ERP 库存。</div>
+   <div id="positionNotice" class="position-notice">可同时记录多个实际储位。必须先确认整组位置再扫描；更换储位后重新确认。</div>
+   <div class="tip">比对三个来源：<b>ERP 报表位置</b>、<b>标签 QR 位置</b>、<b>仓库人员确认的实际位置</b>。只有 ERP、QR、实际仓库和单一储位完全一致才会计入有效重量。多实际储位会保留详细清单并标记异常，防止自动认定正确或多计重量。</div>
  </section>
   </div>
   <div class="card">
@@ -104,7 +148,10 @@
  </section>
  <section class="card tablesection"><div class="section-head"><div><h2>④ ERP 盘点比对 / Inventory Reconciliation</h2><p class="muted">按项目显示 ERP 数量、已扫描重量及差异</p></div><div class="buttons"><button id="showDiscrepancy" class="btn small-btn">只看差异</button><button id="showAllRows" class="btn small-btn">显示全部</button></div></div><div class="filters"><input id="searchInventory" type="text" placeholder="搜索料号 / 批号 / 储位 / 品名"><select id="statusFilter" aria-label="状态筛选"><option value="all">全部状态</option><option value="done">已完成</option><option value="pending">待盘点</option><option value="short">数量不足</option><option value="over">数量超出</option></select><span id="tableSummary" class="muted">0 项记录</span></div><div class="scrolltable"><table class="data-table"><thead><tr><th>状态</th><th>料号 Part No.</th><th>品名 Description</th><th>规格</th><th>仓库</th><th>储位</th><th>批号</th><th class="num">ERP 数量</th><th class="num">扫描重量</th><th class="num">差异 (实-账)</th><th>标签数</th></tr></thead><tbody id="inventoryBody"><tr><td colspan="11" class="blank">请先导入报表</td></tr></tbody></table></div></section>
  <section class="card tablesection"><div class="section-head"><div><h2>⑤ 扫描记录 / Scan History</h2><p class="muted">保存每个标签编号、重量、时间与异常原因</p></div><button id="clearScans" class="btn danger small-btn">清空扫描记录</button></div><div class="filters"><select id="historyFilter" aria-label="扫描记录筛选"><option value="all">全部扫描</option><option value="accepted">有效扫描</option><option value="exception">异常 / 重复</option></select><span id="historySummary" class="muted">0 笔记录</span></div><div class="scrolltable"><table class="data-table"><thead><tr><th>扫描时间</th><th>结果</th><th>Label No.</th><th>料号</th><th>标签仓库</th><th>标签储位</th><th>实际仓库</th><th>实际储位</th><th>ERP 仓库</th><th>ERP 储位</th><th>批号</th><th class="num">净重 KG</th><th>差异 / 备注</th><th>操作</th></tr></thead><tbody id="historyBody"><tr><td colspan="14" class="blank">暂无扫描记录</td></tr></tbody></table></div></section>
- <div class="foot">TMC Stock Take V1.2 · 本机浏览器储存（IndexedDB）· 不上传仓库数据到服务器 · 请定期导出 Excel 备份<br>若更换手机或清除浏览器网站数据，原盘点记录可能会丢失。</div>
+ <div class="foot">TMC Stock Take V1.3.1 · 本机模式仅存设备；登录云端后 ERP 与扫描数据存入 Supabase · 请定期导出 Excel/JSON 备份<br>本机模式数据不会自动同步到云端；云端模式必须联网，扫描保存失败时请重新扫描。</div>
 </main><div id="toast" class="toast" role="alert"></div>
-<script src="vendor/jszip.min.js"></script><script src="i18n.js"></script><script src="app.js" defer></script>
+<script src="vendor/jszip.min.js"></script><script src="i18n.js"></script>
+<script src="cloud-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="cloud.js"></script><script src="app.js" defer></script>
 </body></html>

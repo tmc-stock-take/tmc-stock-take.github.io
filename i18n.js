@@ -5,6 +5,34 @@ const KEY='tmc_stock_take_ui_lang_v1';
 let lang='zh';
 try{lang=localStorage.getItem(KEY)==='en'?'en':'zh';}catch(_){}
 const raw = [
+// V1.3.1 multiple actual locations
+['实际储位 / Actual Racking No. (multiple allowed) *','Actual Racking No. (multiple allowed) *'],
+['可同时输入多个实际储位，以逗号、分号或换行分隔。每张标签的净重只记一次。','Enter several actual rack locations separated by commas, semicolons or line breaks. Weight counts once per label.'],
+['确认实际仓库及一个或多个占用储位；连续扫描时会保留整组储位','Confirm the warehouse and all occupied rack positions; consecutive scans retain the group'],
+['可同时记录多个实际储位。必须先确认整组位置再扫描；更换储位后重新确认。','Multiple actual locations are supported. Confirm the entire location group before scanning; reconfirm after changing it.'],
+['只有 ERP、QR、实际仓库和单一储位完全一致才会计入有效重量。多实际储位会保留详细清单并标记异常，防止自动认定正确或多计重量。','Only one fully matching physical rack location counts as valid weight. Multiple actual racks are recorded as an exception; weights are never multiplied.'],
+['只有三方一致且实际位置唯一的标签会累计重量；多实际储位会单独记录并提示核对，不会拆分或重复计算标签重量。','Only exact three-way matches with a single physical location count toward ERP weight. Multiple occupied racks are recorded for review, without splitting or repeating the label weight.'],
+['ERP 储位在实际清单中','ERP location found in actual list'],['QR 储位在实际清单中','QR location found in actual list'],['额外实际储位','Other physical locations'],['是','Yes'],['否','No'],
+['多位置需人工确认，不能自动视为单一位置 MATCH','Multiple physical locations need review; they cannot be treated as one MATCH'],
+['请先填写实际仓库和至少一个实际储位，再点击确认位置','Enter Actual Warehouse and at least one rack location, then confirm'],
+['实际位置尚未确认，请先确认当前实际储位清单','Confirm the current physical rack list before scanning'],
+['请输入实际仓库和至少一个实际储位','Enter Actual Warehouse and at least one rack location'],
+['实际储位最多 20 个；如需更多，请分开记录并核对','Maximum 20 actual locations per label; split and verify if there are more'],
+['实际储位格式不正确，请使用编号并以逗号或换行分隔','Invalid rack location. Use location codes separated by commas or line breaks'],
+['仓库编号格式不正确','Invalid warehouse code'],
+['已记录多个实际储位','Multiple physical locations recorded'],
+['已有盘点记录，重量不会重复计算','already scanned; weight will not be counted again'],
+['仓库：ERP ','Warehouse: ERP '],['仓库：QR ','Warehouse: QR '],['储位：ERP ','Location: ERP '],[' ≠ QR ',' ≠ QR '],[' ≠ 实际 ',' ≠ Physical '],
+['ERP 储位 ','ERP location '],['QR 储位 ','QR location '],[' 未在实际位置清单中找到（同仓库比对）',' not found in the physical location list (same-warehouse check)'],
+['实际记录多个储位：','Multiple actual rack locations: '],['；多位置需人工确认，不能自动视为单一位置 MATCH','; multiple physical locations require manual review and cannot be treated as a single-location MATCH'],
+['额外实际储位：','Additional actual locations: '],['；','; '],
+['⚠ 实际位置清单已改变，请重新确认后扫描；历史记录不变。','⚠ Physical location list changed. Confirm it before scanning. Scan history is unchanged.'],
+['当前盘点位置：','Current physical location: '],[' 个储位',' rack locations'],
+['。每张标签只记录一次净重；换位置时请重新确认。','. Count net weight once per label. Reconfirm when changing locations.'],
+['（',' ('],['个储位）。扫描时每张标签只计算一次重量。',' rack locations). Weight counted once per label.'],
+
+['ERP 同料号/批號存在多个位置，标签与实际储位清单指向不同 ERP 项目：','ERP contains multiple locations; QR and physical list indicate different ERP entries: '],
+
 // Top-level UI and actions
 ['⬇ 安装 App','⬇ Install App'],
 ['仓库库存盘点','Warehouse Stock Take'],

@@ -1,4 +1,4 @@
-/* TMC Stock Take V1.2 bilingual - ERP x QR label x actual physical warehouse/racking reconciliation */
+/* TMC Stock Take V1.3.1: multi-location physical stock-take + optional realtime cloud */
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);
@@ -32,6 +32,20 @@ function expandScientific(s){s=String(s??'').trim();let m=s.match(/^([+-]?)(\d+)
 }
 function cleanCode(s){return expandScientific(s).normalize('NFKC').trim().replace(/^['“”]+|['“”]+$/g,'').replace(/\s+/g,'').toUpperCase()}
 function cleanLabel(s){return cleanCode(s).replace(/^(?:NO\.?|LABEL(?:NO\.?)?[:：]?)\s*/i,'').replace(/\D/g,'') || cleanCode(s)}
+// A physical label may span several ACTUAL rack positions. Keep each distinct,
+// use exact codes only (2A1 never implicitly matches 2A1-01), and never multiply its weight.
+function parseActualLocations(raw){
+ const src=Array.isArray(raw)?raw.join(','):String(raw??'');
+ const chunks=src.split(/[,，;；\n\r]+/).map(cleanCode).filter(Boolean);
+ const list=[...new Set(chunks)];
+ if(list.length>20)throw Error('实际储位最多 20 个；如需更多，请分开记录并核对');
+ if(list.some(x=>x.length>60||!/^[A-Z0-9_./-]+$/.test(x)))throw Error('实际储位格式不正确，请使用编号并以逗号或换行分隔');
+ return list;
+}
+function savedLocations(pos){return parseActualLocations(pos?.locations?.length?pos.locations:pos?.location||'')}
+function locationText(locs){return locs.join(', ')}
+function sameLocations(a,b){return a.length===b.length&&a.every(x=>b.includes(x))}
+
 function cleanWeight(s){let n=Number(String(s??'').replace(/,/g,'').replace(/\s*kg\s*$/i,'').trim());return Number.isFinite(n)?Math.round(n*1000)/1000:NaN}
 function round3(n){return Math.round((n+Number.EPSILON)*1000)/1000}
 function keyOf(r){return [r.part,r.warehouse,r.location,r.lot].map(cleanCode).join('\u001f')}
@@ -52,7 +66,8 @@ async function openDb(){return new Promise(resolve=>{
 })}
 async function readStore(){if(db)return new Promise(resolve=>{try{const req=db.transaction('store','readonly').objectStore('store').get('snapshot');req.onsuccess=()=>resolve(req.result??null);req.onerror=()=>resolve(null)}catch(e){resolve(null)}});
  try{return JSON.parse(localStorage.getItem('tmc_stock_take_snapshot'))}catch(e){return null}}
-async function saveStore(){let serialized=JSON.stringify(state);
+async function saveStore(){if(window.TMCCloud?.isActive()){window.TMCCloud.savePosition(state.activeLocation);return}
+ let serialized=JSON.stringify(state);
  if(db){try{await new Promise((resolve,reject)=>{const tx=db.transaction('store','readwrite');tx.objectStore('store').put(state,'snapshot');tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});return}catch(e){msg('本机储存失败，请尽快导出 Excel / JSON 备份')}}
  try{localStorage.setItem('tmc_stock_take_snapshot',serialized)}catch(e){msg('浏览器容量不足，请导出数据备份')}
 }
@@ -64,6 +79,7 @@ async function initialize(){db=await openDb();let restored=await readStore();if(
    state.version=2;state.activeLocation=null;await saveStore();
   }
  }restorePositionInputs();render();if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
+ await window.TMCCloud?.start();
 }
 function groupInventory(rows){let map=new Map(),count=0;
  for(const r of rows){let part=cleanCode(r.part),warehouse=cleanCode(r.warehouse),location=cleanCode(r.location),lot=cleanCode(r.lot);let qty=cleanWeight(r.quantity);
@@ -147,6 +163,7 @@ async function confirmImport(){if(!parsed)return;
  let s=parsed.current,source=s.rows.slice(s.headerIndex+1).map(row=>Object.fromEntries(FIELDS.map(([key])=>[key,map[key]>=0?row[map[key]]??'':''])));
  let result=groupInventory(source);
  if(!result.inventory.length){msg('未找到有效资料，请检查栏位和数量');return}
+ if(window.TMCCloud?.isActive()){try{const ok=await window.TMCCloud.importInventory({inventory:result.inventory,reportName:dataFile,importedAt:now()});if(ok){parsed=null;$('mappingPanel').classList.remove('show');$('reportFile').value='';renderComparison(null);notice('云端 ERP 报表已导入','已同步到云端，可以从手机登录同一账号进行盘点。','good')}}catch(e){msg('云端导入失败：'+e.message)}return}
  if(state.inventory.length&&!withConfirm('导入新 ERP 报表会清除目前盘点记录（'+state.history.length+' 笔）。建议先导出备份。是否继续？'))return;
  state.inventory=result.inventory;state.history=[];state.reportName=dataFile;state.importedAt=now();state.nextId=1;state.activeLocation=null;parsed=null;restorePositionInputs();renderComparison(null);
  $('mappingPanel').classList.remove('show');$('reportFile').value='';await saveStore();render();notice('成功导入 ERP 报表',`共读取 ${result.importedLines} 行，合并后 ${result.inventory.length} 项库存。可以开始扫描标签。`,'good');
@@ -165,42 +182,45 @@ function parseScan(raw){let text=String(raw||'').trim();if(!text)throw Error('�
 function validated(obj){let data={...obj,label:cleanLabel(obj.label),warehouse:cleanCode(obj.warehouse),location:cleanCode(obj.location),lot:cleanCode(obj.lot),part:cleanCode(obj.part),weight:cleanWeight(obj.weight)};
  if(!data.label||!data.warehouse||!data.location||!data.lot||!data.part||!Number.isFinite(data.weight)||data.weight<=0)throw Error('QR 部分资料缺失，或净重不是有效正数');return data}
 function physicalPosition(){
- const wh=cleanCode($('actualWarehouse').value),loc=cleanCode($('actualLocation').value);
+ const wh=cleanCode($('actualWarehouse').value), locs=parseActualLocations($('actualLocation').value);
  const saved=state.activeLocation;
- if(!wh||!loc)throw Error('请先填写实际仓库和实际储位，再点击确认位置');
- if(!saved||saved.warehouse!==wh||saved.location!==loc)throw Error('实际位置尚未确认，点击「确认当前盘点位置」后再扫描');
- return {warehouse:saved.warehouse,location:saved.location};
+ if(!wh||!locs.length)throw Error('请先填写实际仓库和至少一个实际储位，再点击确认位置');
+ if(!saved||saved.warehouse!==wh||!sameLocations(savedLocations(saved),locs))throw Error('实际位置尚未确认，请先确认当前实际储位清单');
+ return {warehouse:saved.warehouse,location:locationText(locs),locations:locs};
 }
 function restorePositionInputs(){
  $('actualWarehouse').value=state.activeLocation?.warehouse||'';
- $('actualLocation').value=state.activeLocation?.location||'';
+ $('actualLocation').value=locationText(savedLocations(state.activeLocation));
  updatePositionUI();
 }
 function updatePositionUI(){
- const wh=cleanCode($('actualWarehouse').value),loc=cleanCode($('actualLocation').value);
- const saved=state.activeLocation,confirmed=!!(saved&&wh&&loc&&wh===saved.warehouse&&loc===saved.location);
+ const wh=cleanCode($('actualWarehouse').value);
+ let locs=[],invalid=false;try{locs=parseActualLocations($('actualLocation').value)}catch(e){invalid=true}
+ const saved=state.activeLocation,confirmed=!!(!invalid&&saved&&wh&&locs.length&&wh===saved.warehouse&&sameLocations(savedLocations(saved),locs));
  const badge=$('activePositionBadge'),note=$('positionNotice');
- badge.className='pill '+(confirmed?'ok':saved?'short':'wait');badge.textContent=confirmed?'已确认 '+wh+' / '+loc:saved?'位置待重新确认':'尚未设置';
+ badge.className='pill '+(confirmed?'ok':saved?'short':'wait');
+ badge.textContent=confirmed?'已确认 '+wh+' / '+locs.length+' 个储位':saved?'位置待重新确认':'尚未设置';
  note.className='position-notice '+(confirmed?'active':saved?'dirty':'');
- note.textContent=confirmed?'✓ 当前盘点位置：'+wh+' / '+loc+'。连续扫描将保留该位置；换货架时请重新确认。':saved?'⚠ 位置输入已改变。请确认新位置后再继续扫描；旧的盘点记录不会被更改。':'请先输入仓库编号及实际储位，再点击「确认当前盘点位置」。';
+ note.textContent=confirmed?'✓ 当前盘点位置：'+wh+' / '+locationText(locs)+'。每张标签只记录一次净重；换位置时请重新确认。':saved?'⚠ 实际位置清单已改变，请重新确认后扫描；历史记录不变。':'请先输入实际仓库，再输入一个或多个储位（逗号、分号或换行分隔），点击确认。';
 }
 async function confirmPhysicalPosition(){
- const wh=cleanCode($('actualWarehouse').value),loc=cleanCode($('actualLocation').value);
- if(!wh||!loc){msg('请输入实际仓库和实际储位');return}
- if(wh.length>60||loc.length>80||/[|\r\n]/.test(wh+loc)){msg('位置格式不正确，请检查仓库及储位编号');return}
- state.activeLocation={warehouse:wh,location:loc};
- $('actualWarehouse').value=wh;$('actualLocation').value=loc;
- updatePositionUI();await saveStore();notice('✓ 实际位置已确认',wh+' / '+loc+'。现在可以连续扫描该货架的标签。','good');
+ const wh=cleanCode($('actualWarehouse').value);
+ let locs;try{locs=parseActualLocations($('actualLocation').value)}catch(e){msg(e.message);return}
+ if(!wh||!locs.length){msg('请输入实际仓库和至少一个实际储位');return}
+ if(wh.length>60||!/^[-A-Z0-9_.\/]+$/.test(wh)){msg('仓库编号格式不正确');return}
+ state.activeLocation={warehouse:wh,location:locationText(locs),locations:locs};
+ $('actualWarehouse').value=wh;$('actualLocation').value=locationText(locs);
+ updatePositionUI();await saveStore();
+ notice('✓ 实际位置已确认',wh+' / '+locationText(locs)+'（'+locs.length+' 个储位）。扫描时每张标签只计算一次重量。','good');
  $('scanInput').focus();
 }
 function erpCandidate(scan,actual){
  const candidates=state.inventory.filter(r=>r.part===scan.part&&r.lot===scan.lot);
- if(!candidates.length){return {row:null,reason:state.inventory.some(r=>r.part===scan.part)?'ERP 有此料号，但找不到相同批号 '+scan.lot:'ERP 中找不到该料号及批号',status:'unmatched'}}
+ if(!candidates.length)return {row:null,reason:state.inventory.some(r=>r.part===scan.part)?'ERP 有此料号，但找不到相同批号 '+scan.lot:'ERP 中找不到该料号及批号',status:'unmatched'};
  const labelMatch=candidates.filter(r=>r.warehouse===scan.warehouse&&r.location===scan.location);
- const physicalMatch=candidates.filter(r=>r.warehouse===actual.warehouse&&r.location===actual.location);
- // A scan can correspond to two different ERP lines. Never silently assign stock to one of them.
+ const physicalMatch=candidates.filter(r=>r.warehouse===actual.warehouse&&actual.locations.includes(r.location));
  const possible=[...new Set([...labelMatch,...physicalMatch])];
- if(possible.length>1)return {row:null,status:'ambiguous',reason:'ERP 同料号/批号存在多个位置，标签位置和实际位置对应不同 ERP 项目：'+possible.map(r=>r.warehouse+'/'+r.location).join('、')};
+ if(possible.length>1)return {row:null,status:'ambiguous',reason:'ERP 同料号/批号存在多个位置，标签与实际储位清单指向不同 ERP 项目：'+possible.map(r=>r.warehouse+'/'+r.location).join('、')};
  if(possible.length===1)return {row:possible[0]};
  if(candidates.length===1)return {row:candidates[0]};
  return {row:null,status:'ambiguous',reason:'ERP 同料号/批号有 '+candidates.length+' 个储位，无法确认对应哪一行：'+candidates.map(r=>r.warehouse+'/'+r.location).join('、')};
@@ -209,44 +229,52 @@ function evaluateScan(scan,actual){
  const found=erpCandidate(scan,actual),row=found.row;
  if(!row)return {...found,details:[found.reason]};
  const details=[];
- for(const [field,title] of [['warehouse','仓库'],['location','储位']]){
-  const a=row[field],b=scan[field],c=actual[field];
-  if(a===b&&a===c)continue;
-  const mismatches=[];
-  if(a!==b)mismatches.push('ERP≠标签');
-  if(a!==c)mismatches.push('ERP≠实际');
-  if(b!==c)mismatches.push('标签≠实际');
-  details.push(title+'不符：ERP '+a+' / 标签 '+b+' / 实际 '+c+'（'+mismatches.join('、')+'）');
- }
- return {row,status:details.length?'mismatch':'accepted',details,reason:details.join('；')||'ERP、QR 标签和实际存放位置三方一致'};
+ const erpInActual=actual.warehouse===row.warehouse&&actual.locations.includes(row.location);
+ const qrInActual=actual.warehouse===scan.warehouse&&actual.locations.includes(scan.location);
+ const extraLocations=actual.locations.filter(loc=>loc!==row.location&&loc!==scan.location);
+ if(row.warehouse!==scan.warehouse)details.push('仓库：ERP '+row.warehouse+' ≠ QR '+scan.warehouse);
+ if(row.warehouse!==actual.warehouse)details.push('仓库：ERP '+row.warehouse+' ≠ 实际 '+actual.warehouse);
+ if(scan.warehouse!==actual.warehouse)details.push('仓库：QR '+scan.warehouse+' ≠ 实际 '+actual.warehouse);
+ if(row.location!==scan.location)details.push('储位：ERP '+row.location+' ≠ QR '+scan.location);
+ if(!erpInActual)details.push('ERP 储位 '+row.location+' 未在实际位置清单中找到（同仓库比对）');
+ if(!qrInActual)details.push('QR 储位 '+scan.location+' 未在实际位置清单中找到（同仓库比对）');
+ if(actual.locations.length>1)details.push('实际记录多个储位：'+locationText(actual.locations)+'；多位置需人工确认，不能自动视为单一位置 MATCH');
+ if(extraLocations.length)details.push('额外实际储位：'+locationText(extraLocations));
+ const positionChecks={erpInActual,qrInActual,extraLocations,actualCount:actual.locations.length};
+ return {row,status:details.length?'mismatch':'accepted',details,positionChecks,reason:details.join('；')||'ERP、QR 标签和实际存放位置三方一致'};
 }
 function renderComparison(record){
  const el=$('scanComparison');if(!record){el.classList.add('hide');el.innerHTML='';return}
- const fields=[['仓库','warehouse'],['储位 / Racking No.','location']];
- const result=fields.map(([title,key])=>{
-  const erp=record['erp'+(key==='warehouse'?'Warehouse':'Location')]||'未确认';
-  const label=record[key]||'—',actual=record['actual'+(key==='warehouse'?'Warehouse':'Location')]||'—';
-  const valid=erp!=='未确认';
-  return '<tr><td>'+safe(title)+'</td><td class="'+(valid&&erp!==label?'diff-cell':'')+'">'+safe(erp)+'</td><td class="'+(valid&&label!==erp?'diff-cell':'')+'">'+safe(label)+'</td><td class="'+((valid&&actual!==erp)||actual!==label?'diff-cell':'')+'">'+safe(actual)+'</td></tr>';
- }).join('');
- el.innerHTML='<div class="comparison-title">ERP × QR 标签 × 实际位置</div><div class="scrolltable"><table class="data-table"><thead><tr><th>比对字段</th><th>ERP 系统</th><th>QR 标签</th><th>实际位置</th></tr></thead><tbody>'+result+'</tbody></table></div><div class="comparison-detail">'+safe(tr(record.message||''))+' · Label '+safe(record.label||'—')+' · '+safe(record.part||'—')+' / '+safe(record.lot||'—')+'</div>';
+ const actualLocs=parseActualLocations(record.actualLocations?.length?record.actualLocations:record.actualLocation);
+ const erpW=record.erpWarehouse||'', qrW=record.warehouse||'', actualW=record.actualWarehouse||'';
+ const erpL=record.erpLocation||'', qrL=record.location||'';
+ const valid=!!erpL;
+ const rows=[
+  '<tr><td>'+safe(tr('仓库'))+'</td><td class="'+(valid&&erpW!==qrW?'diff-cell':'')+'">'+safe(erpW||'—')+'</td><td class="'+(valid&&erpW!==qrW?'diff-cell':'')+'">'+safe(qrW||'—')+'</td><td class="'+(valid&&(actualW!==erpW||actualW!==qrW)?'diff-cell':'')+'">'+safe(actualW||'—')+'</td></tr>',
+  '<tr><td>'+safe(tr('储位 / Racking No.'))+'</td><td class="'+(valid&&erpL!==qrL?'diff-cell':'')+'">'+safe(erpL||'—')+'</td><td class="'+(valid&&qrL!==erpL?'diff-cell':'')+'">'+safe(qrL||'—')+'</td><td class="'+(valid&&(actualLocs.length!==1||!actualLocs.includes(erpL)||!actualLocs.includes(qrL))?'diff-cell':'')+'">'+(actualLocs.map(loc=>'<span class="location-chip '+(loc===erpL&&actualW===erpW?'erp-chip':loc===qrL&&actualW===qrW?'qr-chip':'extra-chip')+'">'+safe(loc)+'</span>').join(' ')||'—')+'</td></tr>'
+ ].join('');
+ let flags='';if(valid){const erpYes=actualW===erpW&&actualLocs.includes(erpL),qrYes=actualW===qrW&&actualLocs.includes(qrL),extras=actualLocs.filter(loc=>loc!==erpL&&loc!==qrL);
+ flags='<div class="position-flags"><span class="'+(erpYes?'flag-yes':'flag-no')+'">'+safe(tr('ERP 储位在实际清单中'))+'：'+safe(erpYes?tr('是'):tr('否'))+'</span><span class="'+(qrYes?'flag-yes':'flag-no')+'">'+safe(tr('QR 储位在实际清单中'))+'：'+safe(qrYes?tr('是'):tr('否'))+'</span>'+(extras.length?'<span class="flag-no">'+safe(tr('额外实际储位'))+'：'+safe(locationText(extras))+'</span>':'')+'</div>';
+ }
+ el.innerHTML='<div class="comparison-title">'+safe(tr('ERP × QR 标签 × 实际位置'))+'</div><div class="scrolltable"><table class="data-table"><thead><tr><th>'+safe(tr('比对字段'))+'</th><th>'+safe(tr('ERP 系统'))+'</th><th>'+safe(tr('QR 标签'))+'</th><th>'+safe(tr('实际位置'))+'</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+flags+'<div class="comparison-detail">'+safe(tr(record.message||''))+' · Label '+safe(record.label||'—')+' · '+safe(record.part||'—')+' / '+safe(record.lot||'—')+'</div>';
  el.classList.remove('hide');
 }
 function scannedSum(){let map=new Map();for(let h of state.history){if(h.status!=='accepted')continue;let k=keyOf(h);map.set(k,{sum:round3((map.get(k)?.sum||0)+h.weight),count:(map.get(k)?.count||0)+1})}return map}
 function classify(row,counted){let diff=round3(counted-row.quantity);if(counted===0)return'pending';if(Math.abs(diff)<=TOLERANCE)return'done';if(diff<0)return'short';return'over'}
 async function performScan(raw){
+ if(window.TMCCloud?.isActive()){try{await window.TMCCloud.insertScan(raw)}catch(e){notice('⚠ 云端扫描未保存',e.message+'。请检查网络并重新扫描，避免遗漏。','bad');msg('云端保存失败：'+e.message)}return}
  if(!state.inventory.length){notice('请先导入 ERP 报表','尚未读取库存清单，无法比对扫描标签。','warn');return}
  let actual;try{actual=physicalPosition()}catch(e){notice('请先确认实际盘点位置',e.message,'warn');msg(e.message);return}
  let record,scan;
  try{scan=parseScan(raw)}catch(e){
-  record={id:state.nextId++,at:now(),status:'invalid',message:e.message,raw:String(raw).slice(0,500),actualWarehouse:actual.warehouse,actualLocation:actual.location};
+  record={id:state.nextId++,at:now(),status:'invalid',message:e.message,raw:String(raw).slice(0,500),actualWarehouse:actual.warehouse,actualLocation:actual.location,actualLocations:actual.locations};
   state.history.push(record);await saveStore();render();renderComparison(null);notice('QR 资料格式错误',e.message,'bad');return;
  }
  const result=evaluateScan(scan,actual);
- record={...scan,id:state.nextId++,at:now(),actualWarehouse:actual.warehouse,actualLocation:actual.location,
+ record={...scan,id:state.nextId++,at:now(),actualWarehouse:actual.warehouse,actualLocation:actual.location,actualLocations:actual.locations,positionChecks:result.positionChecks||null,
          erpWarehouse:result.row?.warehouse||'',erpLocation:result.row?.location||'',status:result.status,message:result.reason};
- if(state.history.some(h=>h.label===scan.label&&h.status==='accepted')){
-  record.status='duplicate';record.message='Label '+scan.label+' 已有三方 MATCH 记录，重量不会重复计算'+(result.status==='mismatch'?'；本次位置异常：'+result.reason:'');
+ if(state.history.some(h=>h.label===scan.label&&h.label&&['accepted','mismatch','ambiguous','unmatched'].includes(h.status))){
+  record.status='duplicate';record.message='Label '+scan.label+' 已有盘点记录，重量不会重复计算'+(result.status==='mismatch'?'；本次位置异常：'+result.reason:'');
  }else if(result.status==='accepted'){
   record.message='ERP、QR 标签和实际存放位置三方一致';
  }
@@ -307,17 +335,22 @@ async function exportExcel(){if(!state.inventory.length){msg('请先导入 ERP �
  try{
  const rows=exportRows(),history=state.history;
  const counts={done:rows.filter(r=>r.status==='done').length,pending:rows.filter(r=>r.status==='pending').length,short:rows.filter(r=>r.status==='short').length,over:rows.filter(r=>r.status==='over').length};
- const summary=[['Stock Take Summary','Value'],['ERP file',state.reportName],['Import time',state.importedAt],['Export time',now()],['ERP inventory lines',rows.length],['Completed',counts.done],['Not yet counted',counts.pending],['Quantity short',counts.short],['Over quantity',counts.over],['Accepted scans',history.filter(h=>h.status==='accepted').length],['Exceptional scans',history.filter(h=>h.status!=='accepted').length],['Physical position mismatch',history.filter(h=>h.status==='mismatch').length],['Ambiguous ERP row',history.filter(h=>h.status==='ambiguous').length],['V1.0 legacy scans requiring recheck',history.filter(h=>h.status==='legacy').length],['Quantity tolerance (kg)',TOLERANCE],['Source','Local browser data']];
+ const summary=[['Stock Take Summary','Value'],['ERP file',state.reportName],['Import time',state.importedAt],['Export time',now()],['ERP inventory lines',rows.length],['Completed',counts.done],['Not yet counted',counts.pending],['Quantity short',counts.short],['Over quantity',counts.over],['Accepted scans',history.filter(h=>h.status==='accepted').length],['Exceptional scans',history.filter(h=>h.status!=='accepted').length],['Physical position mismatch',history.filter(h=>h.status==='mismatch').length],['Ambiguous ERP row',history.filter(h=>h.status==='ambiguous').length],['V1.0 legacy scans requiring recheck',history.filter(h=>h.status==='legacy').length],['Quantity tolerance (kg)',TOLERANCE],['Source',window.TMCCloud?.isActive()?'Supabase cloud':'Local browser data'],['Multiple actual rack groups',history.filter(h=>h.actualLocations?.length>1&&h.status!=='duplicate').length],['Note','For multi-rack labels, Net KG is counted ONCE per label, NOT repeated per rack.']];
  const rec=[['Status','Part No.','Description','Specification','Warehouse','Location','Lot No.','ERP Qty (KG)','Scanned Qty (KG)','Difference (KG)','Label Count','Unit'],...rows.map(r=>[statusInfo(r.status)[0],r.part,r.name,r.spec,r.warehouse,r.location,r.lot,r.quantity,r.scanned,r.difference,r.count,r.unit])];
- const scan=[['Scanned At','Status','Label No.','Part No.','Lot No.','QR Warehouse','QR Location','Actual Warehouse','Actual Location','ERP Warehouse','ERP Location','Net Weight (KG)','Reason','Raw QR'],...history.map(h=>[h.at,statusInfo(h.status)[0],h.label||'',h.part||'',h.lot||'',h.warehouse||'',h.location||'',h.actualWarehouse||'',h.actualLocation||'',h.erpWarehouse||'',h.erpLocation||'',Number.isFinite(h.weight)?h.weight:'',tr(h.message||''),h.raw||''])];
- const exception=[['Type','Scan Time','Label No.','Part No.','Lot No.','QR Warehouse','QR Location','Actual Warehouse','Actual Location','ERP Warehouse','ERP Location','Net Weight (KG)','Note'],...history.filter(h=>h.status!=='accepted').map(h=>[statusInfo(h.status)[0],h.at,h.label||'',h.part||'',h.lot||'',h.warehouse||'',h.location||'',h.actualWarehouse||'',h.actualLocation||'',h.erpWarehouse||'',h.erpLocation||'',Number.isFinite(h.weight)?h.weight:'',tr(h.message||'')])];
- const actualSummary=[['Actual Warehouse','Actual Racking No.','Part No.','Lot No.','Labels Scanned','Physical Weight (KG)','Triple-Matched Weight (KG)','Exception Weight (KG)','Statuses'],...(()=>{
-   const map=new Map();for(const h of history){if(!h.part||!h.actualWarehouse||!h.actualLocation||!Number.isFinite(h.weight)||h.status==='duplicate'||h.status==='legacy')continue;
+ const scan=[['Scanned At','Status','Label No.','Part No.','Lot No.','QR Warehouse','QR Location','Actual Warehouse','Actual Locations (all)','ERP Warehouse','ERP Location','ERP in Actual','QR in Actual','Additional Locations','Net Weight (KG)','Reason','Raw QR'],...history.map(h=>[h.at,statusInfo(h.status)[0],h.label||'',h.part||'',h.lot||'',h.warehouse||'',h.location||'',h.actualWarehouse||'',h.actualLocation||'',h.erpWarehouse||'',h.erpLocation||'',h.positionChecks?(h.positionChecks.erpInActual?'YES':'NO'):'',h.positionChecks?(h.positionChecks.qrInActual?'YES':'NO'):'',h.positionChecks?.extraLocations?.join(', ')||'',Number.isFinite(h.weight)?h.weight:'',tr(h.message||''),h.raw||''])];
+ const exception=[['Type','Scan Time','Label No.','Part No.','Lot No.','QR Warehouse','QR Location','Actual Warehouse','Actual Locations (all)','ERP Warehouse','ERP Location','ERP in Actual','QR in Actual','Additional Locations','Net Weight (KG)','Note'],...history.filter(h=>h.status!=='accepted').map(h=>[statusInfo(h.status)[0],h.at,h.label||'',h.part||'',h.lot||'',h.warehouse||'',h.location||'',h.actualWarehouse||'',h.actualLocation||'',h.erpWarehouse||'',h.erpLocation||'',h.positionChecks?(h.positionChecks.erpInActual?'YES':'NO'):'',h.positionChecks?(h.positionChecks.qrInActual?'YES':'NO'):'',h.positionChecks?.extraLocations?.join(', ')||'',Number.isFinite(h.weight)?h.weight:'',tr(h.message||'')])];
+ const actualSummary=[['Actual Warehouse','Actual Racking No. (group, not split weight)','Part No.','Lot No.','Labels Scanned','Physical Weight (KG)','Triple-Matched Weight (KG)','Exception Weight (KG)','Statuses'],...(()=>{
+   const map=new Map(),seenLabels=new Set();for(const h of history){if(!h.part||!h.actualWarehouse||!h.actualLocation||!Number.isFinite(h.weight)||h.status==='duplicate'||h.status==='legacy')continue;
+     if(h.label&&seenLabels.has(h.label))continue;if(h.label)seenLabels.add(h.label);
      const key=[h.actualWarehouse,h.actualLocation,h.part,h.lot].join('\u001f');if(!map.has(key))map.set(key,{wh:h.actualWarehouse,loc:h.actualLocation,part:h.part,lot:h.lot,labels:new Set(),weight:0,accepted:0,exception:0,statuses:new Set()});
      const x=map.get(key);if(x.labels.has(h.label))continue;x.labels.add(h.label);x.weight=round3(x.weight+h.weight);if(h.status==='accepted')x.accepted=round3(x.accepted+h.weight);else x.exception=round3(x.exception+h.weight);x.statuses.add(statusInfo(h.status)[0]);
    }return [...map.values()].map(x=>[x.wh,x.loc,x.part,x.lot,x.labels.size,x.weight,x.accepted,x.exception,[...x.statuses].join(', ')]);
   })()];
-  const sheets=[['Summary',summary,[29,53]],['Reconciliation',rec,[16,20,43,20,15,18,19,18,20,20,16,12]],['ScanHistory',scan,[23,17,17,21,19,16,18,18,18,18,18,19,60,65]],['Exceptions',exception,[18,24,17,21,19,18,18,18,18,18,18,20,72]],['ActualLocations',actualSummary,[21,23,21,19,19,21,26,25,30]]];
+  const locationsDetail=[['Scanned At','Label No.','Part No.','Lot No.','Actual Warehouse','One of Actual Locations','ERP Location Exact','QR Location Exact','Status','Note (Weight)'],
+   ...history.filter(h=>h.actualWarehouse&&h.actualLocation&&h.status!=='duplicate').flatMap(h=>parseActualLocations(h.actualLocations?.length?h.actualLocations:h.actualLocation).map(loc=>[
+     h.at||'',h.label||'',h.part||'',h.lot||'',h.actualWarehouse,loc,(h.actualWarehouse===h.erpWarehouse&&loc===h.erpLocation)?'YES':'NO',(h.actualWarehouse===h.warehouse&&loc===h.location)?'YES':'NO',statusInfo(h.status)[0],'Location reference only. Net KG is NOT allocated to each rack.'
+   ]))];
+  const sheets=[['Summary',summary,[29,53]],['Reconciliation',rec,[16,20,43,20,15,18,19,18,20,20,16,12]],['ScanHistory',scan,[23,17,17,21,19,16,18,18,35,18,18,17,17,31,19,60,65]],['Exceptions',exception,[18,24,17,21,19,18,18,18,35,18,18,17,17,31,20,72]],['ActualLocations',actualSummary,[21,44,21,19,19,21,26,25,30]],['LocationDetails',locationsDetail,[22,17,21,18,20,26,22,22,18,66]]];
  const zip=new JSZip();
  zip.file('[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'+sheets.map((_,i)=>'<Override PartName="/xl/worksheets/sheet'+(i+1)+'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join('')+'</Types>');
  zip.file('_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
@@ -329,19 +362,24 @@ async function exportExcel(){if(!state.inventory.length){msg('请先导入 ERP �
  }catch(e){console.error(e);msg('Excel 导出失败：'+e.message)}
 }
 function exportJson(){revokeUrl(new Blob([JSON.stringify({version:2,exportedAt:now(),state},null,2)],{type:'application/json'}),'TMC_StockTake_Backup_'+stamp()+'.json');msg('JSON 备份已下载')}
-async function importJson(file){try{let obj=JSON.parse(await file.text());let incoming=obj.state||obj;if(!Array.isArray(incoming.inventory)||!Array.isArray(incoming.history))throw Error('备份格式不正确');
+async function importJson(file){if(window.TMCCloud?.isActive()){msg('云端模式不直接恢复 JSON，请先退出云端并在本机模式恢复。');$('backupInput').value='';return}
+ try{let obj=JSON.parse(await file.text());let incoming=obj.state||obj;if(!Array.isArray(incoming.inventory)||!Array.isArray(incoming.history))throw Error('备份格式不正确');
  if(!withConfirm('恢复 JSON 备份会覆盖目前报表与盘点记录。确定继续？'))return;
  state={version:2,inventory:incoming.inventory,history:incoming.history.map(h=>(!incoming.version||incoming.version<2)&&h.status==='accepted'?{...h,status:'legacy',message:'旧版未验证实际位置；需重新盘点'}:h),reportName:incoming.reportName||'',importedAt:incoming.importedAt||'',nextId:incoming.nextId||1,activeLocation:incoming.version>=2?incoming.activeLocation||null:null};
   state.nextId=Math.max(0,...state.history.map(x=>Number(x.id)||0))+1;
   await saveStore();restorePositionInputs();render();msg('成功恢复 '+state.inventory.length+' 项库存和 '+state.history.length+' 笔扫描记录');
  }catch(e){msg('备份恢复失败：'+e.message)}finally{$('backupInput').value=''}}
 async function deleteHistory(id){const found=state.history.find(h=>h.id===id);if(!found||!withConfirm('删除这笔 '+(found.label||'异常')+' 扫描记录？有效记录的重量会重新计算。'))return;
+ if(window.TMCCloud?.isActive()){try{await window.TMCCloud.deleteScan(found.cloudId);notice('云端记录已删除','已同步盘点重量。','warn')}catch(e){msg('删除失败：'+e.message)}return}
  state.history=state.history.filter(h=>h.id!==id);await saveStore();render();notice('记录已删除','盘点重量已经重新计算。','warn')}
 async function undo(){if(!state.history.length){msg('暂无扫描记录可以撤销');return}let last=state.history[state.history.length-1];if(!withConfirm('撤销最后扫描记录 Label '+(last.label||'(无效QR)')+'？'))return;
+ if(window.TMCCloud?.isActive()){try{await window.TMCCloud.deleteScan(last.cloudId);notice('云端扫描已撤销','已同步到所有设备。','warn')}catch(e){msg('撤销失败：'+e.message)}return}
  state.history.pop();await saveStore();render();notice('已撤销扫描','最近一笔扫描记录已经移除。','warn')}
 async function clearScans(){if(!state.history.length){msg('没有需要清空的扫描记录');return}if(!withConfirm('清空 '+state.history.length+' 笔扫描记录？ERP 报表将保留，无法撤销。'))return;
+ if(window.TMCCloud?.isActive()){try{await window.TMCCloud.clearScans();notice('已清空云端扫描','此操作已同步到其他设备。','warn')}catch(e){msg('清空失败：'+e.message)}return}
  state.history=[];await saveStore();render();notice('已清空扫描','ERP 库存资料保留，可以重新盘点。','warn')}
 async function clearAll(){if(!state.inventory.length&&!state.history.length){msg('目前没有盘点资料');return}if(!withConfirm('确定删除本机 ERP 报表以及所有扫描记录？建议先导出 Excel/JSON 备份。'))return;
+ if(window.TMCCloud?.isActive()){if(!withConfirm('云端模式：此操作将删除当前账号的所有盘点任务及扫描记录，所有设备都会受到影响。确定永久删除？'))return;try{await window.TMCCloud.clearAll();notice('已清空云端盘点','所有设备上的云端盘点任务已删除。','warn')}catch(e){msg('清空云端失败：'+e.message)}return}
  await stopCamera();state={version:2,inventory:[],history:[],reportName:'',importedAt:'',nextId:1,activeLocation:null};await saveStore();restorePositionInputs();render();notice('盘点资料已清空','请重新导入 ERP 库存报表。','warn')}
 function photoError(){msg('本浏览器未提供照片 QR 识别功能。请改用 Chrome Android 相机或 2D 扫描枪。')}
 async function detectPhoto(file){if(!file)return;
@@ -376,7 +414,8 @@ function hookEvents(){addBackupButtons();$('reportFile').addEventListener('chang
  $('demoBtn').addEventListener('click',async()=>{dataFile='示例ERP报表.csv';parsed={current:candidateSheet({name:'Demo',rows:[['料件編號','品名','規格','倉庫編號','儲位','批號','庫存數量','庫存單位'],['5899951013108','Sweep keep Sample (-35 mesh)-Slag TRC-Mixed','Mixed','L002','3A1-113','20260617','190.300','KG']]})};showMapping();msg('示例报表已读取，请确认导入')});
  $('actualWarehouse').addEventListener('input',updatePositionUI);$('actualLocation').addEventListener('input',updatePositionUI);
  $('confirmPosition').addEventListener('click',confirmPhysicalPosition);
- for(const id of ['actualWarehouse','actualLocation'])$(id).addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('confirmPosition').click()}});
+ $('actualWarehouse').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('confirmPosition').click()}});
+ $('actualLocation').addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();$('confirmPosition').click()}});
  $('cameraBtn').addEventListener('click',toggleCamera);$('scanBtn').addEventListener('click',async()=>{let s=$('scanInput').value.trim();if(s){$('scanInput').value='';await performScan(s)}else msg('请输入 QR 标签内容')});
  $('scanInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('scanBtn').click()}});
  $('photoInput').addEventListener('change',e=>detectPhoto(e.target.files[0]));
@@ -392,6 +431,48 @@ function hookEvents(){addBackupButtons();$('reportFile').addEventListener('chang
  $('installBtn').addEventListener('click',async()=>{if(!deferredInstall)return;deferredInstall.prompt();await deferredInstall.userChoice;deferredInstall=null;$('installBtn').hidden=true});
  window.addEventListener('pagehide',stopCamera);
 }
+
+// V1.3 Cloud bridge. Local state is isolated from server-side stock-take batches.
+// Cloud writes go to Supabase first; only committed server records are counted.
+window.StockTakeCore={
+  getState:()=>state,
+  applyRemote:remote=>{
+    const position=state.activeLocation;
+    state={...state,...remote,activeLocation:position};
+    render();renderComparison(null);
+  },
+  setPosition:position=>{state.activeLocation=position;restorePositionInputs()},
+  restoreLocal:async()=>{
+    const restored=await readStore();
+    state=restored&&Array.isArray(restored.inventory)&&Array.isArray(restored.history)?{...state,...restored}:{version:2,inventory:[],history:[],reportName:'',importedAt:'',nextId:1,activeLocation:null};
+    state.nextId=Math.max(0,...state.history.map(h=>Number(h.id)||0))+1;
+    restorePositionInputs();render();renderComparison(null);
+  },
+  prepareScan:raw=>{
+    if(!state.inventory.length)throw Error('云端尚未导入 ERP 报表');
+    const actual=physicalPosition();let scan,record;
+    try{scan=parseScan(raw)}catch(e){return {id:0,at:now(),status:'invalid',label:'',message:e.message,raw:String(raw).slice(0,500),actualWarehouse:actual.warehouse,actualLocation:actual.location}}
+    const result=evaluateScan(scan,actual);
+    record={...scan,id:0,at:now(),actualWarehouse:actual.warehouse,actualLocation:actual.location,actualLocations:actual.locations,positionChecks:result.positionChecks||null,erpWarehouse:result.row?.warehouse||'',erpLocation:result.row?.location||'',status:result.status,message:result.reason};
+    if(state.history.some(h=>h.label===scan.label&&h.label&&['accepted','mismatch','ambiguous','unmatched'].includes(h.status))){
+      record.status='duplicate';record.message='Label '+scan.label+' 已有盘点记录，重量不会重复计算';
+    }
+    return record;
+  },
+  showCloudScan:record=>{
+    renderComparison(record);
+    if(record.status==='accepted'){
+      const sums=scannedSum(),row=state.inventory.find(r=>keyOf(r)===keyOf(record));
+      const counted=sums.get(keyOf(record))?.sum||0;
+      const stat=row?classify(row,counted):'';
+      notice(stat==='done'?'✓ MATCH · 盘点完成':stat==='over'?'⚠ MATCH · 数量超出':'✓ MATCH · 已云端同步',
+        'Label '+record.label+' · '+displayNumber(record.weight)+' KG · '+(row?'已累计 '+displayNumber(counted)+' / ERP '+displayNumber(row.quantity)+' KG':'保存成功'),stat==='over'?'bad':'good');
+      navigator.vibrate?.(75);
+    }else if(record.status==='duplicate')notice('重复标签 / DUPLICATE',record.message,'warn');
+    else if(record.status==='mismatch')notice('⚠ LOCATION MISMATCH',record.message+'。未计入有效盘点重量。','bad');
+    else notice('⚠ 扫描异常 / SCAN EXCEPTION',record.message||record.status,'bad');
+  }
+};
 window.StockTakeRender=()=>{render();updatePositionUI();window.StockTakeI18n?.apply()};
 hookEvents();loadPromise=initialize();
 })();

@@ -1,105 +1,81 @@
-# TMC Warehouse Stock Take V1.2 — 中文 / English
+# TMC Warehouse Stock Take V1.3.1 — 电脑 ↔ 手机实时同步 / PC ↔ Phone Realtime Sync
 
-## 新增：中英文双语 / What's new
+> **重要**：这是可部署的完整 V1.3.1 程序和 Supabase 数据库建库文件，但**在您自己创建并配置 Supabase 项目之前，手机/电脑不会自动同步**。没有配置时，仍可使用原有 V1.2 本机盘点功能。
 
-- 页面右上角新增 **🌐 中文 / English**，可即时切换；语言偏好记在当前浏览器，不影响 ERP 或扫描历史。
-- 中文、英文界面包括导航、操作按钮、ERP 导入、实际仓库/储位、扫描提示、盘点状态、扫描历史、异常原因和导出通知。
-- 中文 / English 两种界面共用相同 ERP 数据、扫描结果和盘点记录。Excel / CSV 栏名保持可读的英文字段名，状态和异常原因按选用语言输出。
-- 继续使用之前选定的 **蓝色扫码枪 Stock Take 图标**。新版 `sw.js` 使用 V1.2 缓存版本，帮助 PWA 更新。
-- QR 解析、实际位置三方比对、防重复、JSON 备份、离线支持功能保持不变。
+## V1.3.1 新增
 
-## 更新现有 GitHub Pages / Upgrade instructions
+- **云端同步 / Cloud Sync**：电脑和 Android 手机使用相同邮箱账号登录，读取同一份 ERP 库存报表、扫描历史与差异汇总。
+- **实时提示 / Live updates**：Supabase Realtime 接收变更，另外每 15 秒刷新以应对断线或后台休眠。
+- **数据防重复 / No double counting**：数据库约束使同一盘点任务内相同 Label No. 只能有一笔有效 MATCH；重复会保存为异常记录，不重复加重。
+- **严格三方比对 / Three-way reconciliation**：ERP 仓库/储位 × QR 标签仓库/储位 × 实际确认仓库/储位，三方一致才计重。
+- **联网才提交 / Online writes**：网络断开、登录过期或保存失败，会显示「未保存」，必须重新扫描；不会冒充同步成功。
+- **保留本机模式 / Local mode preserved**：旧 V1.2 IndexedDB 数据不会被偷偷上传云端；退出云端可继续访问原本本机记录。建议升级前先导出 JSON 备份。
+- **中英文 / Chinese + English**，原先的蓝色扫码枪图标保持不变。
 
-1. **先在网站内导出 JSON 备份**，保留重要盘点资料。
-2. 解压 ZIP，将所有文件直接上传到原 `tmc-stock-take.github.io` Repository 的根目录，**包括新文件 `i18n.js`**、`index.html`、`app.js`、`sw.js`、图标和 `vendor` 文件夹。
-3. 在 GitHub 提交 `Commit changes`，到 `Actions` 确认 GitHub Pages 部署成功。
-4. 手机打开 `https://tmc-stock-take.github.io/`，看左上角是否显示 **V1.2**；如仍是旧版，关闭 PWA 后用 Chrome 刷新网站。
-5. 在右上角切换 `English` 或 `中文`。**不要清除浏览器网站数据**，否则本地盘点记录可能丢失。
 
-**English:** Export a JSON backup first. Upload all unzipped files—including **i18n.js**—to the existing repository root, commit, and verify the Pages deployment. Reopen the site and choose English from the language selector. Do not clear site data.
+## V1.3.1 — 一个标签对应多个实际储位 / Multiple Actual Racking Locations
+
+在 **Actual Racking No.** 中可以输入 `2A1, 2A1-01, 2A1-02`，以逗号、分号或换行分隔，点击 **确认当前盘点位置** 后再扫 QR。系统将这三个储位作为同一张标签的「实际占用位置清单」保存，并提供 ERP/QR 位置是否包含其中的独立检查结果。储位编号仅做**精确匹配**，例如 `2A1` 不会误判与 `2A1-01` 相同。
+
+例子：ERP 是 `A001 / 2A1-01`；QR 是 `B000 / 51430`；实际仓库是 `A001`，实际储位是 `2A1, 2A1-01, 2A1-02`。系统显示：ERP 储位存在于实际清单、QR 储位不存在、两个额外储位、QR 仓库和 ERP/实际仓库不一致；**整笔记为位置异常，不计入有效 ERP 盘点重量**。仓库人员需人工调查实际占用/标签/ERP 的差异。即使其中一个储位匹配 ERP，其他实际储位也不会被自动忽略。
+
+**重量安全规则**：一张 Label No. 净重只保留一次，不因输入多个实际储位而重复计算。Excel 的 `ScanHistory`、`Exceptions` 会展示全部实际位置和检查标志，`ActualLocations` 将多位置作为**一个位置组**汇总重量；新增 `LocationDetails` 为每个位置单独列明，但**不分配/重复写入同一标签的净重**。原有单储位记录仍可读取。
+
+English: enter multiple occupied racks separated by commas, semicolons or line breaks, then confirm the location group. The comparison checks each rack code exactly and reports mismatches/extra positions without assuming a match or distributing the label's net weight across racks.
+
+### 可复制测试资料 / Quick Test
+
+- 先导入附带的 `示例_多储位ERP报表.csv`。
+- 实际 Warehouse：`A001`，实际 Racking No.：`2A1, 2A1-01, 2A1-02`；点击确认整组位置。
+- 手动扫描 QR 内容：`NO.009998|B000|51430|20260617|5899951013108|190.300`。
+- 预期：`LOCATION MISMATCH`，ERP 实际存在 `YES`，QR 实际存在 `NO`，额外位置 `2A1` / `2A1-02`；有效盘点重量 `0 KG`，异常实物重量记录 `190.300 KG` 且只计一次。
+- 重复扫描相同 Label No. 显示重复记录，净重不重复；切换到单储位 `2A1-01` 并扫描全新 Label No. 且 QR `A001 / 2A1-01`，则可正常 MATCH。
+
+## A. 创建 Supabase 云端数据库（首次设置）
+
+1. 到 https://supabase.com/dashboard 创建账号及 **New project**，选择您获授权使用的组织/项目及适当地区。Supabase 是第三方云端服务；使用前应遵守公司内部数据保护要求。
+2. 项目准备好后，进入 **SQL Editor → New query**，打开压缩包中的 **`supabase_schema.sql`**，完整复制 SQL，点击 **Run**。仅需对新项目执行一次。该脚本创建 `stocktake_batches`、`stocktake_scans`、各项索引、唯一标签约束、Row Level Security（仅本人可访问）及 Realtime 数据表发布。
+3. 进入 **Authentication → Providers → Email**，确认 Email/Password 已开启。若开启 Email confirmation，注册后需先点收件箱的验证链接。**Authentication → URL Configuration**：Site URL 设为 `https://tmc-stock-take.github.io/`，可把此地址加入 Redirect URLs。
+4. 在 Supabase 项目 **Connect** 或 **Project Settings → API Keys** 取得 **Project URL**（`https://...supabase.co`）以及 **Publishable key**（一般以 `sb_publishable_` 开头；旧项目可用 anon public key）。
+5. 在网页版 V1.3.1 的「云端同步」区输入上述 Project URL 与 Publishable Key，点 **连接云端 / Connect**。**不要输入 Secret Key / service_role**；这些密钥不应出现在 GitHub 公共文件或浏览器中。
+6. 如果想让公司电脑及手机无需分别输入 URL/key，可将 ZIP 中 `cloud-config.js` 填上 **公开的** Project URL 和 Publishable Key 后上传；请绝对不要填写管理员/secret/service_role 密钥。
+
+## B. 发布至原来的 GitHub Pages
+
+1. 在旧版本中先 **↓ JSON 备份**，再下载并解压这个 ZIP。
+2. 进入 GitHub Repository：`https://github.com/tmc-stock-take/tmc-stock-take.github.io`。
+3. **Add file → Upload files**，把 ZIP 解压后的网站文件上传到 Repository 根目录（尤其 `index.html`、`app.js`、`i18n.js`、`cloud.js`、`cloud-config.js`、`sw.js`、`vendor/jszip.min.js` 和图标），覆盖旧版，再 **Commit changes**。
+4. **Settings → Pages** 选择 `Deploy from a branch` → `main` → `/(root)`；**Actions** 中确认 Pages 部署成功。
+5. 使用 `https://tmc-stock-take.github.io/` 打开网站，左上角应显示 **V1.3.1**。旧 PWA 不刷新时关闭旧 App，使用 Chrome 重新访问并刷新；**不要清除浏览器数据**。
+
+> `supabase_schema.sql` 和本说明可以保留在 ZIP 及 Repository；里面没有 API 密钥。**不要将实际 ERP 报表、库存清单或 JSON 备份上传到 Public GitHub Repository。**
+
+## C. 实际盘点流程
+
+1. **电脑端**：在网站云端区注册/登录账户 → 上传 ERP Excel/CSV → 确认字段 → 点击「确认导入报表」。出现「云端 ERP 报表已导入」才算成功。
+2. **Android 手机端**：打开同一个网站 → 云端区填写相同 Project URL / Publishable Key（若未预配置）→ 用**同一个邮箱账户**登录。应能看到电脑上传的 ERP 报表。
+3. 手机先输入并确认 **Actual Warehouse** 与 **Actual Racking No.**，再扫描物料 QR。显示 **MATCH** 才能计入有效重量。
+4. 电脑端无需重新上传 ERP；可观察扫描记录、异常和重量在 Realtime 通知后更新，后台睡眠或断线恢复时最长可等待下一次 15 秒检查，也可按云端区 **↻ Refresh**。
+5. 电脑端可导出 Excel，包括 **Summary、Reconciliation、ScanHistory、Exceptions、ActualLocations**；也可以 JSON 备份。
+
+## 重要限制及保安
+
+- **同一账号**：V1.3 采用一个云端账号在电脑/手机登录的同步模式。**不包含**多员工独立账号的共用任务、审批及分级权限；若要让不同员工分别登录且共同盘点，需要后续新增公司团队/成员管理。不要把公司账号密码任意分享。
+- **云端要联网**：本机模式仍可离线使用；云端模式**不支持离线排队后自动上传**，断网时须联网后重扫，避免误以为成功。
+- **公司资料**：上传到 Supabase 的数据由第三方云服务托管，可能涉及公司库存、货品、储位和重量，使用前请确认公司许可。GitHub Pages 只放网站程序，不存放 ERP 原始 Excel 文件；实际盘点数据库的库存记录与扫描记录保存在 Supabase。
+- **访问控制**：SQL 使用 Auth + RLS，只允许登录账户访问其自己的记录；所有设备务必使用经授权的账号，启用设备锁屏和强密码。公开的 Publishable/anon Key 本身不是密码，安全主要依赖用户身份验证与 RLS。
+- **一次仅查看最新任务**：上传新的 ERP 报表创建新云端任务，旧任务会保留在数据库但 V1.3 界面只显示最新一份。清空全部云端盘点会删除该账号下全部任务与历史；该操作需要二次确认。
+- **测试程度**：本地功能、语言切换及模拟 Supabase 保存/查重流程已测试。尚未使用您的实际 Supabase 凭据进行跨设备端到端测试；正式上线前请先用示例 ERP 报表和示例 Label 009998 做实际联机验收。
 
 ---
 
-# TMC Warehouse Stock Take V1.1.1 — 已换成你选的蓝色扫码图标
+# English Quick Start
 
-这是 **V1.1 盘点系统的图标更新版**。保留 ERP 导入、QR 扫描、实际仓库/储位三方比对、盘点记录及导出功能；本次只更新 App/浏览器图标和静态资源版本。
+1. Create your own Supabase project and run **`supabase_schema.sql`** in SQL Editor.
+2. Enable Email/Password in Authentication, set site/redirect URL to `https://tmc-stock-take.github.io/`.
+3. In the app, enter your Supabase Project URL and **public publishable/anon key**. Never enter any secret/service_role key.
+4. Create/sign in to an authorized email account. On the PC, import the ERP report. On Android, sign in using **the same account**, confirm the physical warehouse and racking number, then scan printed QR labels.
+5. The PC should receive scan updates live and also refreshes periodically as a backup. Duplicate valid labels are blocked from double counting at the database level.
+6. This release does **not** include multi-employee role sharing or offline cloud upload. Data already stored in V1.2 local mode is not automatically uploaded.
 
-## GitHub Pages 更新方式（无需新建 Repository）
-
-1. 将本 ZIP **解压**，打开你现有的 `tmc-stock-take.github.io` Repository 的 **Code** 页面。
-2. 选择 `Add file → Upload files`，上传解压后的所有文件及 `vendor` 文件夹，覆盖现有文件。
-3. 点击 `Commit changes`。GitHub Pages 会从 `main / (root)` 重新部署。
-4. 在网站按 `Ctrl+F5` 或重新打开网页。若 Android 主屏幕图标仍是旧图标，可先移除旧的主屏幕快捷方式，再从 Chrome 重新安装；**请不要清除网站数据或重置盘点资料**。
-5. 网站的实际网址请以 GitHub `Settings → Pages` 显示的 **Your site is live at** 为准。
-
-## 图标文件
-
-- `icon-192.png`、`icon-512.png`：Android / PWA App 图标。
-- `icon-maskable-512.png`：适配 Android 自适应图标。
-- `apple-touch-icon.png`：iPhone 主屏幕图标。
-- `favicon-64.png`：浏览器标签页图标。
-- `icon.svg`：为兼容旧文件引用，同时更新为同款图标。
-
----
-
-# TMC Warehouse Stock Take V1.1 — 三方盘点系统
-
-本版本是独立的本地存储网页 App，可直接上传至 GitHub Pages（不影响原有 `tmc-qr-scanner` 项目）。
-
-## V1.1 新增：ERP × QR 标签 × 实际仓库/储位
-
-1. **① 导入 ERP 报表**：Excel `.xlsx` 或 `.csv`，确认自动检测的料号、品名、规格、仓库、储位、批号、库存数量、单位栏位。
-2. **② 确认实际盘点位置**：输入 `Actual Warehouse`、`Actual Racking No.`（例如 `L002`、`3A1-113`），点击「确认当前盘点位置」。不确认或输入已改动时不能扫描。
-3. **③ 扫描 QR 标签**：连续扫描同一个实物储位的多张标签，不必重复输入仓库/储位；换储位时重新输入并确认。支持 Android Chrome 相机（浏览器需 BarcodeDetector API）、二维扫码枪、手动输入和照片（浏览器支持时）。
-4. 盘点系统会比较三个位置来源：ERP 报表、QR 标签和刚刚**人工确认的实际存放位置**。三者仓库和储位都一致，才判定 `MATCH` 并累计净重。相同 Label No. 不会重复计重。
-5. 存在差异时，界面显示三栏对照、原因及对应 Label No.；异常扫描不计入三方匹配重量，不会自动修改 ERP。
-6. **④ 盘点比对**显示 ERP 数量、匹配扫描净重、数量差异；**⑤ 扫描记录**同时显示标签、实际和 ERP 的仓库/储位，以及异常说明。
-7. Excel 导出包括五个工作表：`Summary`、`Reconciliation`、`ScanHistory`、`Exceptions`、`ActualLocations`；后一个表汇总实物储位的扫描净重和异常重量。CSV 则导出库存比对与该 ERP 行关联的异常实际位置。
-8. 使用 JSON 备份/恢复可在设备之间转移记录，但**没有自动云同步**。
-
-## 你的示例
-
-ERP：料号 `5899951013108`，批号 `20260617`，仓库 `L002`，储位 `3A1-113`，重量 `190.300 KG`。
-
-标签二维码：`NO.009998|L002|3A1-113|20260617|5899951013108|190.300`
-
-- 实际位置 **L002 / 3A1-113**：三方 MATCH，190.300 KG 可以计入盘点。
-- 实际位置 **L002 / 3A1-115**：ERP/QR 均为 3A1-113，实际为 3A1-115；提示储位异常，190.300 KG 不计入 MATCH。
-- 实际位置 **L003 / 3A1-115**：ERP/QR 均为 L002 / 3A1-113；同时提示仓库与储位异常。
-- 如果同料号/批号在 ERP 具有多项不同仓库或储位，而标签及实物位置指向不同 ERP 行，系统显示「ERP 多位置」，不会随意归入其中一个 ERP 项目。
-
-**注意**：输入的“实际位置”由盘点人员确认，程序不会通过 QR 读出货物真正所在位置；所以必须在货架现场核实后填写。扫码标签上没有储位变化的信息时，单靠标签也无法判断货物是否被移动。
-
-## 旧版本升级（非常重要）
-
-- 直接将 V1.1 的文件上传覆盖同一个 GitHub Pages 仓库中的旧程序文件；不用删除库存资料。
-- 既有 ERP 导入数据可保留（相同浏览器、相同网站地址、未清理站点数据的前提下）。
-- **V1.0 扫描历史没有实际位置字段**，因此旧版 MATCH 将自动转成「旧版待复盘」，保留历史但不计入 V1.1 的三方 MATCH 净重。请按实际储位重新扫描对应标签。这样不会把旧纪录误认为已经核对过真实位置。
-- 新版缓存名已更换，网页更新后刷新或完全关闭重开 PWA。如果手机仍见旧版本，可清除网站缓存（不要清除网站储存资料，避免盘点记录丢失），并以网页版本文字 V1.1 确认。
-
-## GitHub Pages 部署
-
-1. 下载 ZIP 并解压。
-2. 打开独立的 GitHub 仓库（建议 `tmc-stock-take`），上传根目录中的 `index.html`、`app.js`、`sw.js`、`manifest.webmanifest`、`icon.svg`、`vendor` 文件夹。
-3. Settings → Pages → Deploy from a branch → main → /(root) → Save。
-4. 等待 GitHub Pages 发布后以 HTTPS 网址打开；首次使用相机需授权。添加到 Android 主屏幕可作为 PWA 使用。
-
-## 技术限制
-
-- ERP / 实盘数量按 KG 处理，误差 ±0.001 KG。非 KG 单位不做单位换算。
-- QR 预期包含六项：`Label | Warehouse | Location | Lot | Part | Net`，会自动去除 `NO.` 标记。
-- 品名/规格不会自动与 QR 匹配，因为该 QR 码不包含这两项。
-- Excel 如果把长料号**有损舍入**为科学计数法，可能不可逆；建议从 ERP 导出原始 XLSX，或保留料号为文本。
-- 相机功能依赖手机浏览器 `BarcodeDetector`；不支持时建议使用 USB/蓝牙二维扫码枪或手动输入。
-- 所有库存和盘点记录保存在当前设备本地浏览器，默认不发送至云端；每次盘点后请下载 Excel 与 JSON 备份。
-- V1.1 不允许扫描异常位置的重量进入账面匹配数，但仍可通过 `ActualLocations` 工作表回顾扫描到的实物重量。
-
-## 文件说明
-
-- `index.html` 页面和样式
-- `app.js` 报表导入、三方比对、扫码、防重复、导出与本地储存
-- `vendor/jszip.min.js` 离线 Excel ZIP 读取/生成依赖
-- `sw.js` 离线资源缓存
-- `manifest.webmanifest` 与 `icon.svg` PWA 图标/元数据
-- `示例ERP报表.csv` 演示 ERP 资料
-- `THIRD_PARTY_LICENSES.md` 第三方组件许可
+Supabase official guidance: https://supabase.com/docs/guides/database/postgres/row-level-security and https://supabase.com/docs/guides/realtime/postgres-changes
