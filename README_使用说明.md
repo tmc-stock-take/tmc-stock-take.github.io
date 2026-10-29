@@ -1,160 +1,40 @@
-# TMC Warehouse Stock Take V1.3.7 — 分页面导航版 / Multi-Page Navigation
+# TMC Warehouse Stock Take V1.3.8 — ERP 单张标签严格匹配
 
+本版根据最新确认规则，**严格禁止累计多张 QR 标签净重来满足一笔 ERP 数量**。
 
-## V1.3.7 更新：盘点统计移到「扫码盘点」页面
+## 本版唯一有效的盘点匹配规则
 
-- 五张盘点统计卡片（ERP 库存项目、已完成盘点、待盘点/数量不足、异常/数量超出、已盘点标签）由「ERP 导入」页面**移到「扫码盘点」页面的顶部**。
-- 「扫码盘点」页面现在依次显示：**盘点统计 → QR 扫描 → ERP 盘点比对**。
-- 「ERP 导入」页面保留报表上传、实际位置设置、Excel/CSV 导出和备份。
-- 统计数字由原来的计算逻辑自动更新，不新增或修改盘点数据；手机显示为两列卡片，电脑显示为一行五列。
-- 保留 V1.3.6 所有扫码、声音、Excel、中文/英文和 Supabase 云端同步功能，**数据库无需升级**。
-- 使用前建议先备份 JSON；更新网站文件后查看页面显示 **V1.3.7**。
+1. 必须先导入 ERP Excel (.xlsx) 或 CSV。必填 ERP 栏位：**料件编号、品名、仓库、储位、批号、库存数量**。
+2. QR 码包含 `Label No. | 仓库 | 储位 | 批号 | 料号 | 净重`。由于 QR **没有品名**，系统通过料号寻找 ERP 品名，并显示在比对和待选择的 ERP 项目中。无法独立核实打印标签的文字品名。
+3. 匹配必须同时满足 **ERP 料号对应的品名、批号和该行单笔数量（Net KG）**。数量允许 ±0.001 KG 的浮点表示误差。扫描不同重量的标签，**不计入完成，不能再扫其他标签补重量**。
+4. 同料号、同批号和同重量出现在多个 ERP 行（不同储位）时，显示列表让操作员选择。没有确认前不保存有效盘点。
+5. **每个 ERP 库存行最多一张有效标签；每个 Label No. 最多有效一次**，防止重复计数。
+6. QR 上旧仓库和储位保留作为参考，不影响匹配结果。ERP 与实际仓库/储位不符，仍可在 **品名、批号、单笔数量完全匹配** 后计为完成，同时单独记录位置差异。
+7. 历史记录即使过去显示成功，新版也会按照本规则重新认定；**历史标签重量不符合 ERP 单笔数量的记录不再计入有效完成数**。请预先备份，并审查旧扫描。
 
-## 新版布局
+### 你提供的真实问题示例
 
-V1.3.7 将之前同一长页面拆成 5 个单独页面，用顶部导航（电脑）或固定底部导航（手机）切换：
+- ERP 行：Part `5007803105001`，品名 `S-Silicon w/PM on Tape(Roll)`，Lot `S2618`，库存 `378.600 KG`。
+- 扫描标签：Label `008856`，Part 相同，Lot 相同，但 Net `361.100 KG`。
+- **正确结果：数量不符（-17.500 KG），未完成，已保存异常扫描记录；不允许追加 17.500 KG 凑成 378.600 KG。**
+- 扫到一个不同的 Label，净重恰好 `378.600 KG`，该 ERP 行尚未完成且无其他匹配歧义时，才算完成。
 
-1. **云端同步 / Cloud Sync**：Supabase 连接、登录和刷新。
-2. **ERP 导入 / ERP Import**：ERP Excel/CSV 上传、栏位对应、实际仓库与储位、Excel/CSV 下载、JSON 备份及恢复。
-3. **扫码盘点 / Scan & Count**：二维码相机/扫描枪/照片/手动输入、扫描结果和 ERP 盘点比对放在同一个画面。
-4. **扫描记录 / Scan History**：扫描历史、过滤和单笔删除。
-5. **声音设置 / Sound Settings**：扫码声音开关、3 种音效、音量和试听。
+## 页面结构（保留 V1.3.7）
 
-**重要**：只是调整界面显示与导航，不修改 Part/Lot 匹配、计重、差异判断、Excel 格式及 Supabase 数据表。换页不会清空报表及扫描记录。扫描中切换到其他页面会关闭相机以节省电量并保护隐私。
+- **同步**：连接 Supabase；电脑上传 ERP、手机扫描可共享数据（需自行完成 Supabase 配置）。
+- **ERP 导入**：Excel/CSV 导入和栏位对应，实际仓库/储位、报表下载、JSON 备份。
+- **扫码盘点**：五张统计卡、QR 扫描、ERP 盘点比对。
+- **扫描记录**：有效盘点/数量异常/重复/旧记录待复核。
+- **声音设置**：清脆、扫码枪、柔和提示音及音量。
 
-## 更新 GitHub Pages
+Excel 直接导出为单一 `.xlsx`，仍含 7 张工作表；料号文本格式、状态颜色及实际储位匹配保留。Excel 的 ScanHistory 和 Exceptions 会说明数量比对是否匹配，供复盘。
 
-1. 先在原站导出 JSON 和 Excel 备份，尤其使用真实云端数据时请有数据库备份。
-2. 解压 V1.3.7 ZIP，把**所有内容**上传到原 `tmc-stock-take.github.io` Repository 根目录，覆盖同名文件，**必须包含新增 `tabs.js`**。保留 `vendor` 目录及其他云端配置文件。
-3. Commit changes，进入 GitHub → Actions 查看 Pages 部署成功。手机刷新或关闭再打开 App，确认顶部是 **V1.3.7**。
-4. 如果仍显示旧界面，清理单个站点缓存前务必备份数据；一般可先强制刷新或等 Service Worker 更新，**不要删除 Chrome 网站存储**。
+## GitHub Pages 更新
 
-**云端同步**仍需要项目 URL、可公开的 publishable key 和数据库配置，单纯部署 GitHub Pages 不会自行开启同步。此版无需新 SQL。
+1. 从旧版导出 JSON 和 Excel 备份。使用云端时也应备份 Supabase 数据。
+2. 解压完整 ZIP，把**解压后的文件和 vendor 目录**上传到原先 `tmc-stock-take.github.io` Repository 根目录；覆盖同名文件，不要只上传 ZIP。
+3. 提交后检查 GitHub Actions 的 Pages 部署为绿色成功，打开网站确认版本 **V1.3.8**。
+4. 手机 PWA 旧版可能暂时被 Service Worker 缓存。关闭并重新打开或刷新页面，**不要直接清除网站数据**。
+5. 此版沿用既有 Supabase 状态 `mismatch` 来记录数量不符；**已配置 V1.3.2 或以上数据库时无需新 SQL**。首次使用云端仍要按内附 `supabase_schema.sql` 建表。服务端尚未在用户自己的 Supabase 项目中做联机验收。
 
----
-
-# TMC Stock Take V1.3.5 — Excel 直接下载与扫码音效
-
-## 升级内容
-
-1. **一个标准 Excel (.xlsx) 文件**：点击绿色「↓ 导出 Excel (.xlsx)」，下载一个包含 7 个工作表的 Office Open XML 工作簿（LocationVariance、Summary、Reconciliation、ScanHistory、Exceptions、ActualLocations、LocationDetails），并设置正确的 XLSX 文件 MIME 类型。不会把 sheet1、sheet2 分别下载。原有彩色状态、完整料号、实际储位精确对应不变。
-2. **请勿解压 .xlsx**：.xlsx 内部本来是 ZIP 格式，Windows 如果尚未安装 Excel 或未正确关联，会把 `.xlsx` 显示成 “Compressed (zipped) Folder”。此时文件仍是有效的 Excel 工作簿；需要安装 Excel / WPS / LibreOffice，或上传至 Excel Online 打开。网页无法改变 Windows 的文件关联。
-3. **三种扫码音效**：清脆（默认）、扫描枪、柔和；可调音量（10%–100%），提供成功、位置差异、重复及错误四种试听。每个结果使用不同声响，设置会记住。全部采用本机 Web Audio，不需要下载音频文件。手机需允许声音播放，设备媒体音量不能静音。
-4. 保留 V1.3.4 多储位、ERP 行选择、防重复、中文/English、扫码记录、数据备份及 Supabase 模式。无数据库结构更新。
-
-## 上传 GitHub Pages
-
-1. 建议先导出 JSON 备份，不要清除浏览器网站资料。
-2. 解压 V1.3.5 ZIP；把**里面的所有网站文件**（包括 `vendor`）上传到原 `tmc-stock-take.github.io` Repository 根目录并覆盖。
-3. 点击 Commit changes，检查 GitHub Actions 已部署。Chrome 打开网站确认顶部 V1.3.5。
-4. 电脑点击「导出 Excel (.xlsx)」，请直接打开下载的 `.xlsx`，**不要选择 Extract All**。
-5. 手机扫码区选择音效风格和音量，点「试听」检查；必要时增加手机媒体音量。
-
-## 安全注意
-
-- 本机数据不会因更换音效而删除；真实云端同步依赖现有 Supabase 配置。
-- CSV 无法保留 Excel 单元格颜色，请用 .xlsx。
-- `.xlsx` 是一个基于 ZIP 封装的 Excel 工作簿，因此在未正确安装/关联表格软件的电脑上，显示为 ZIP 图标并不代表下载程序有问题。
-
----
-
-# TMC Stock Take V1.3.4 — Excel 盘点报告优化（Excel Export Fix）
-
-## 本次更新（与 V1.3.3 比较）
-
-1. **彩色状态**：在「↓ 导出 Excel」生成的 `.xlsx` 文件中，`Reconciliation` 工作表的 **状态 Status** 一栏会自动显示：完成 = 绿色、超出 = 红色、数量不足 = 黄色、未盘点 = 灰色。CSV 文件不支持单元格背景色，需要使用 `.xlsx` 查看彩色状态。
-2. **完整料号**：Excel 的 **料件編號 Part No.** 以「文字」类型写入，不会自动变成 `5.0078E+12`。CSV 中纯数字长料号使用 Excel 兼容的安全数字字符串表达式，直接用 Excel 打开时也显示完整号码；此表达式只包裹十位以上的纯数字，不执行任意外部公式。若以其他软件编辑 CSV，可能看到 `="5007801201001"`，属正常。请优先使用 `.xlsx`。
-3. **实际位置精确匹配**：`Actual Warehouse / Location (Exceptions)` 现在仅填写与这一 ERP 行 **仓库和储位都完全相同** 的已盘标签实际位置，如 `A001/2A1-01`。如实际储位清单为 `2A1, 2A1-01, 2A1-02, 2A1-03`，对应 ERP 行是 `A001/2A1-01`，该格只填 `A001/2A1-01`；若未发现完全匹配，则此格留空，供检查，其他实际位置仍保留在 `ScanHistory`、`LocationDetails` 和 `LocationVariance` 中。
-4. Excel 的 `Reconciliation` 工作表现在与 CSV 的十三列保持一致，包含 `Location Exception Labels` 和 `Actual Warehouse / Location (Exceptions)`。同一标签仍只计重一次。
-
-**注意**：只修改导出报表与其显示，不修改已保存的扫描记录、不改 ERP 库存、不改变云端 SQL 表结构。旧版本已经导出的 Excel/CSV 不会自动改变，请升级后重新点击导出。
-
-## 更新原网站
-
-1. 先备份现有盘点 Excel / JSON（使用云端模式还应备份 Supabase 数据）。
-2. 将 ZIP 解压后的所有文件上传到 `https://github.com/tmc-stock-take/tmc-stock-take.github.io` 根目录，覆盖旧版。保留 `vendor/jszip.min.js` 文件夹结构。
-3. 进入 GitHub → Actions，确认 GitHub Pages 部署成功。重新打开网页应显示 **V1.3.4**。
-4. 请点击绿色的 **↓ 导出 Excel** 来查看状态颜色；CSV 无法包含单元格颜色。
-5. 不需要重新运行 Supabase SQL 或重新导入 ERP；升级后重新导出报告即可。
-
----
-
-# TMC Warehouse Stock Take V1.3.4 — ERP 多储位匹配修正版
-
-## 核心修复：同料号、同批号、多个 ERP 储位
-
-例如同一料号 `5007803101001`、批号 `50078-2608-01` 在 ERP 两个储位 `A001 / 2A1-01` (135.200 KG) 和 `A001 / 2A1-02` (195.900 KG)。实际盘点位置又同时选择两个储位时：
-
-- 系统先按料号、批号匹配 ERP；**不会**用 QR 标签上的仓库 / 储位判断。
-- 如果某一笔 ERP 的**剩余未盘点重量**与扫描 QR 净重在 0.001 KG 内唯一相同，自动分配到该 ERP 项目；ERP 行为汇总数时，这仅表示量吻合，仍须现场核查物料。
-- 如果无法唯一分辨，显示各 ERP 记录，包含仓库、储位、ERP 数量、已盘重量、剩余重量；**扫描未保存/未计重**。选择一笔后才计入，**无需重新扫描 QR**。
-- 标签重复扫描不会再次计重。多储位、位置差异、中文/English、扫码哔声、Excel、Supabase 模式保留。
-- 一张标签的净重只计到**一笔 ERP 库存项目**。有位置差异照常记录为异常待查；不会修改 ERP 数据。
-
-### 更新方式
-
-1. 更新前备份现有盘点 JSON、Excel。云端模式请确认云端有数据库备份。
-2. 解压此包，将全部文件与 `vendor` 文件夹内容上传至 `tmc-stock-take.github.io` Repository 根目录（不是上传 ZIP 文件本身）。
-3. GitHub Actions 部署成功后，Chrome 刷新并确认页首 **V1.3.4**。若手机已安装 PWA，请关闭重新打开，不要清空网站储存。
-4. **此前 V1.3.2 的「ERP 项目无法唯一对应」未计重记录不会自动改成有效扫描**；请重新扫该张 QR，然后选择正确 ERP 行。
-5. 若 V1.3.2 的 Supabase 数据库已完成设置，本次没有新增状态或字段，无需再次执行 SQL。若尚未设置，请按压缩包中 Supabase 说明配置。
-
-> 工作提示：如果同料号和同批号在 ERP 多储位，重量一致也不能单独证明物料属哪笔 ERP；若现场不能确认，请先核查，勿随意选择。
-
-# TMC Warehouse Stock Take V1.3.4 — 取消 QR 位置比对 + 扫码提示音
-
-这是一份完整可部署到 GitHub Pages 的网页/PWA 程序，包含中文与英文、ERP Excel/CSV 导入、手机/扫码枪扫描、多个实际储位、ERP 与实际位置差异、Excel 报表，以及可选的 Supabase 电脑↔手机同步。
-
-## V1.3.4 核心规则
-
-1. 扫描 QR 标签，从中读取 **Label No.、Part No.、Lot No.、Net Weight (KG)** 进行物料识别和重量累计。原 QR 标签上的 **Warehouse 和 Location 完全不参与库存匹配及位置判断**，但保存在扫描历史作参考，不要求改标签。
-2. 以 **Part No. + Lot No.** 在 ERP 查找物料；如 ERP 有多笔相同料号/批号，先用实际仓库和实际位置锁定唯一 ERP 行。**如果无法唯一确认，标记 Ambiguous（待核对），不会胡乱计重**。
-3. 当料号/批号能唯一对应 ERP 行，并由操作员确认实物确实存在时：即使 ERP 仓库或储位和实物不符，仍计入**已盘点 COUNTED**，同时记录 **ERP LOCATION VARIANCE**，不修改 ERP 原始库存。
-4. 实际位置允许输入 `2A1, 2A1-01, 2A1-02` 多个储位：保存整组位置，只计一次标签净重，并标记 **COUNTED · MULTIPLE LOCATIONS** 待确认精确位置；**这不是把重量拆成三份，也不意味着每一储位各有一份标签重量**。
-5. 相同 Label No. 如果已有有效盘点（包括位置差异和多储位），重扫标记 **DUPLICATE**，不得重复累计。旧 V1.3.1 的 `mismatch` 扫描记录**不会自动转成已盘点**；为避免误转换历史记录，需要核查后重新扫描该标签（可在新规则下正常计重）。
-6. QR 标签上的 Net Weight 是**标签声明重量**，并非实物过磅证明；实际称重不符仍须人工核查。盘点重量按标签记录累计，比对 ERP 行的库存数量，超量显示差异。
-
-### 测试例子
-
-- ERP：`A001 / 2A1-01`，Part `5899951013108`、Lot `20260617`、ERP Qty `190.300 KG`
-- QR：`NO.009998|B000|51430|20260617|5899951013108|190.300`
-- 实际 `A001 / 2A1-01`：**COUNTED**，190.300 KG 已计入；QR B000/51430 不影响。
-- 实际 `A001 / 2A1-02`：**COUNTED · LOCATION VARIANCE**，190.300 KG 已计入，另列 ERP 储位差异。
-- 实际 `A001 / 2A1, 2A1-01, 2A1-02`：**COUNTED · MULTIPLE LOCATIONS**，190.300 KG 只计一次，实际精确储位待确认。
-
-## 扫描“哔”声 / Beep Sound
-
-扫码栏上方新增“扫码提示音 / Beep sound”开关和“♫ 试听 / Test”按钮。首次使用可先点击“试听”；扫码成功播放一次较高音短“哔”，已盘点但位置差异/多储位播放双声提醒，重复标签播放双次低音，格式/资料异常播放更低的警示音。关掉后会记住该设备的选择。手机静音、媒体音量设定或浏览器自动播放限制可能使提示音无法听到；请确认设备媒体音量并先在网页上点击一次按钮。没有外部声音文件，音效通过浏览器 Web Audio 在设备本地生成。
-
-## Excel 报表
-
-- **Reconciliation**：每笔 ERP 库存数量、已盘点总重量与差异（包含位置差异计重）。
-- **LocationVariance**：已盘点但 ERP 仓库/储位不同，或实际多个储位待确认的记录，供之后调整 ERP。
-- **ScanHistory**：每张标签及其 QR 旧仓库/储位、实际仓库/储位、ERP 仓库/储位与重量；QR 栏明确注明不参与比对。
-- **Exceptions**：需要调查的记录（包含已盘点但位置待查、重复标签、ERP 无匹配等）。
-- **ActualLocations / LocationDetails**：以储位组汇总并展示完整多个实际储位；不按储位重复加标签重量。
-
-## 上传 GitHub Pages
-
-1. **升级前在旧版网页先下载 JSON 备份及 Excel**（本机模式）。不要清除 Chrome/Android 浏览器网站数据。
-2. 下载 V1.3.4 ZIP，解压后把网站文件及 `vendor` 文件夹上传覆盖到公司 Repository 根目录（`index.html` 必须在根目录）：https://github.com/tmc-stock-take/tmc-stock-take.github.io
-3. GitHub → **Add file → Upload files → Commit changes**。确认 `sound.js` 同步上传。GitHub Pages 设置维持 **Deploy from a branch → main → /(root)**。
-4. 新版首次加载应出现 **V1.3.4**；手机如有旧版缓存，请关闭 App 后在 Chrome 刷新网页，或重新添加主屏幕快捷方式。勿清除网站数据。
-
-## Supabase 云端同步（重要：需更新 SQL）
-
-- **新建数据库**：在 Supabase 项目 SQL Editor 执行 `supabase_schema.sql`。
-- **以前已配置 V1.3/V1.3.1 Supabase 数据库**：先备份数据，再在 SQL Editor 执行包内 **`supabase_upgrade_v132.sql`**，为 `counted_variance` 和 `counted_multi` 增加合法状态，并扩展 Label No. 的云端唯一限制。**单纯覆盖 GitHub 网站文件不足以完成云端升级**。
-- 电脑和手机仍须配置 Supabase Project URL + **公开** publishable/anon key、登录同一已授权账号，才能看到同一份报表和扫码记录。不可在客户端填写 Supabase service_role / secret key。
-- 无云端配置时仍是本机模式：不同设备**不会自动同步**。
-- 云端需要网络，保存失败会提示重新扫描；断网不会把未保存记录标为成功。推荐先用示例数据在手机/电脑验证，然后再投入正式盘点。
-- GitHub Public 仓库仅上传网站程序，**不要上传真实 ERP 报表、库存数据、JSON 备份、公司账号密码**。向 Supabase 上传库存资料前需确认公司允许使用第三方托管服务。
-- 这版仍是同一云端账号跨设备使用，暂未实施各员工独立账号的共用盘点任务权限。
-
-> 注意：旧版 `mismatch` 不自动回算重量。需要审核历史扫描并重新扫描，以免不经核实就把旧异常批量转为有效盘点。
-
-## English quick guide
-
-V1.3.4 uses QR **Part No. + Lot No. + Net KG** to identify/count an item. QR warehouse/rack codes are *historical references only* and never used for matching. Count uniquely identifiable items even when ERP location differs, but add a **Location Variance** follow-up report; multiple actual rack locations are grouped without allocating/repeating weight. The new sound toggle plays a short beep for a successful scan and distinctive warning tones for duplicates or exceptions.
-
-For cloud mode, existing V1.3/V1.3.1 Supabase installations **must run `supabase_upgrade_v132.sql` in SQL Editor** before using new statuses. Real-device cloud synchronization requires your own Supabase credentials; only simulated cloud tests were run here.
+说明：扫码 QR 的 Net KG 为**标签登记重量**，不是现场实物重新过磅的独立证据。数量不符需要人工核查。

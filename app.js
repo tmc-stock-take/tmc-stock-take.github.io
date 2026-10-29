@@ -1,9 +1,9 @@
-/* TMC Stock Take V1.3.7: standard OOXML download (.xlsx) with correct MIME + sound selection */
+/* TMC Stock Take V1.3.8: ERP quantity is authority; shortage is NOT completed. */
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);
 const FIELDS = [
-  ['part','料件編號 / Part No.',true], ['name','品名 / Description',false],
+  ['part','料件編號 / Part No.',true], ['name','品名 / Description',true],
   ['spec','規格 / Specification',false], ['warehouse','倉庫編號 / Warehouse',true],
   ['location','儲位 / Location',true], ['lot','批號 / Lot No.',true],
   ['quantity','庫存數量 / Stock Quantity',true], ['unit','庫存單位 / Unit',false]
@@ -84,7 +84,7 @@ async function initialize(){db=await openDb();let restored=await readStore();if(
 }
 function groupInventory(rows){let map=new Map(),count=0;
  for(const r of rows){let part=cleanCode(r.part),warehouse=cleanCode(r.warehouse),location=cleanCode(r.location),lot=cleanCode(r.lot);let qty=cleanWeight(r.quantity);
- if(!part||!warehouse||!location||!lot||!Number.isFinite(qty)||qty<0)continue;
+ if(!part||!String(r.name??'').trim()||!warehouse||!location||!lot||!Number.isFinite(qty)||qty<0)continue;
  const one={part,warehouse,location,lot,quantity:qty,name:String(r.name??'').trim(),spec:String(r.spec??'').trim(),unit:String(r.unit??'KG').trim()||'KG',lines:1};
  let k=keyOf(one);if(map.has(k)){let prev=map.get(k);prev.quantity=round3(prev.quantity+qty);prev.lines++;if(!prev.name)prev.name=one.name;if(!prev.spec)prev.spec=one.spec}else map.set(k,one);count++;
  }
@@ -163,7 +163,7 @@ async function confirmImport(){if(!parsed)return;
  let map={};for(let [key,title,required] of FIELDS){let v=$('map_'+key).value;if(required&&!v){msg('请指定必要栏位：'+title);return}map[key]=v?Number(v.slice(1)):-1}
  let s=parsed.current,source=s.rows.slice(s.headerIndex+1).map(row=>Object.fromEntries(FIELDS.map(([key])=>[key,map[key]>=0?row[map[key]]??'':''])));
  let result=groupInventory(source);
- if(!result.inventory.length){msg('未找到有效资料，请检查栏位和数量');return}
+ if(!result.inventory.length){msg('未找到有效资料：请检查品名、料号、批号、仓库、储位和数量。');return}
  if(window.TMCCloud?.isActive()){try{const ok=await window.TMCCloud.importInventory({inventory:result.inventory,reportName:dataFile,importedAt:now()});if(ok){parsed=null;$('mappingPanel').classList.remove('show');$('reportFile').value='';renderComparison(null);notice('云端 ERP 报表已导入','已同步到云端，可以从手机登录同一账号进行盘点。','good')}}catch(e){msg('云端导入失败：'+e.message)}return}
  if(state.inventory.length&&!withConfirm('导入新 ERP 报表会清除目前盘点记录（'+state.history.length+' 笔）。建议先导出备份。是否继续？'))return;
  closeERPChoice();state.inventory=result.inventory;state.history=[];state.reportName=dataFile;state.importedAt=now();state.nextId=1;state.activeLocation=null;parsed=null;restorePositionInputs();renderComparison(null);
@@ -218,38 +218,38 @@ async function confirmPhysicalPosition(){
 // Printed QR warehouse and rack are historical references only.
 // Identify material by Part No. + Lot No.; never select an ERP row by the QR location.
 function erpCandidate(scan,actual,chosenKey=null){
- const candidates=state.inventory.filter(r=>r.part===scan.part&&r.lot===scan.lot);
- if(!candidates.length)return {row:null,reason:state.inventory.some(r=>r.part===scan.part)?'ERP 有此料号，但找不到相同批号 '+scan.lot:'ERP 中找不到该料号及批号',status:'unmatched'};
- // A manual selection always has priority. It is validated against the CURRENT ERP batch.
- if(chosenKey!==null){const selected=candidates.find(r=>keyOf(r)===chosenKey);if(selected)return {row:selected,assignment:'manual'};
-   return {row:null,status:'ambiguous',candidates,reason:'选择的 ERP 库存项目已不存在。请重新核对当前报表。'};}
- if(candidates.length===1)return {row:candidates[0],assignment:'only'};
- const current=scannedSum();
- // Exact uncounted balance provides a reliable hint even when printed QR rack is old.
- // Never use the QR warehouse/rack as an identifier.
- const weightMatches=candidates.filter(r=>Math.abs(round3(r.quantity-(current.get(keyOf(r))?.sum||0))-scan.weight)<=TOLERANCE);
- if(weightMatches.length===1)return {row:weightMatches[0],assignment:'weight'};
- const physical=candidates.filter(r=>r.warehouse===actual.warehouse&&actual.locations.includes(r.location));
- if(physical.length===1)return {row:physical[0],assignment:'location'};
- const sameWarehouse=candidates.filter(r=>r.warehouse===actual.warehouse);
- if(physical.length===0&&sameWarehouse.length===1)return {row:sameWarehouse[0],assignment:'warehouse'};
- const prioritized=physical.length?physical:sameWarehouse.length?sameWarehouse:candidates;
- return {row:null,status:'ambiguous',candidates:prioritized,reason:'料号 '+scan.part+' / 批号 '+scan.lot+' 在 ERP 有 '+candidates.length+' 个库存项目；请从下方选择本张标签应计入的 ERP 仓库及储位（无需重扫）。'};
+ // Barcode supplies Part, Lot, Net KG but does not supply Description.
+ // The product description is taken from the uploaded ERP row indexed by Part No.
+ const batch=state.inventory.filter(r=>r.part===scan.part&&r.lot===scan.lot);
+ if(!batch.length)return {row:null,status:'unmatched',reason:state.inventory.some(r=>r.part===scan.part)?
+   'ERP 中有此料号，但无批号 '+scan.lot+'；本次未盘点。':'上传的 ERP 报表找不到料号 '+scan.part+' / 批号 '+scan.lot+'；本次未盘点。'};
+ const exact=batch.filter(r=>Math.abs(round3(r.quantity-scan.weight))<=TOLERANCE);
+ if(!exact.length){
+  const detail=batch.map(r=>r.name+' / '+r.lot+' / '+r.warehouse+'/'+r.location+'：'+displayNumber(r.quantity)+' KG').join('；');
+  return {row:null,status:'mismatch',quantityMismatch:true,candidates:batch,
+   reason:'ERP 数量不一致 / QUANTITY MISMATCH：QR '+displayNumber(scan.weight)+' KG。ERP 对应品名、批号与单笔数量：'+detail+'。不能累计重量，也不能判定完成。'};
+ }
+ const valid=new Set(state.history.filter(isCounted).map(countedKey));
+ const available=exact.filter(r=>!valid.has(keyOf(r)));
+ if(chosenKey!==null){
+  const selected=exact.find(r=>keyOf(r)===chosenKey);
+  if(!selected)return {row:null,status:'unmatched',reason:'所选 ERP 记录的品名/批号/数量不符合标签，无法计入。'};
+  if(valid.has(keyOf(selected)))return {row:null,status:'duplicate',reason:'这笔 ERP 库存项目已经完成盘点，不可用另一张标签再次计入。'};
+  return {row:selected,assignment:'manual'};
+ }
+ if(!available.length)return {row:null,status:'duplicate',reason:'符合品名、批号和数量的 ERP 库存项目已经完成盘点。请检查是否重复扫描。'};
+ if(available.length===1)return {row:available[0],assignment:'exact'};
+ return {row:null,status:'ambiguous',candidates:available,reason:'有 '+available.length+' 笔相同料号、批号与单笔数量的 ERP 记录。为避免误分配，须选择正确 ERP 仓库和储位。'};
 }
 function closeERPChoice(){pendingERPScan=null;const el=$('erpChoicePanel');el.classList.add('hide');el.innerHTML='';}
 function showERPChoice(raw,candidates){
  let scan;try{scan=parseScan(raw)}catch(e){notice('QR 资料错误',e.message,'bad');return}
- if(!Array.isArray(candidates)||!candidates.length){notice('无法找到 ERP 候选项目','请重新导入 ERP 报表后重扫。','bad');return}
- pendingERPScan={raw,candidates:candidates.map(r=>keyOf(r))};
- const sums=scannedSum();
- const rows=candidates.map((r,i)=>{
-    const counted=sums.get(keyOf(r))?.sum||0,remaining=round3(r.quantity-counted),near=Math.abs(remaining-scan.weight)<=TOLERANCE;
-    const yes=near?'<span class="choice-hint">重量与 ERP 剩余量相同 / Net KG equals remaining</span>':'';
-    return '<div class="choice-row"><div><strong>'+safe(r.warehouse)+' / '+safe(r.location)+'</strong>'+yes+'<div class="muted">'+safe(r.part)+' · '+safe(r.lot)+'<br>ERP '+displayNumber(r.quantity)+' KG · 已盘 '+displayNumber(counted)+' KG · 剩余 '+displayNumber(remaining)+' KG</div></div><button type="button" class="btn primary" data-erp-choice="'+i+'">'+safe(tr('选择并计入 / Count here'))+'</button></div>';
- }).join('');
+ if(!Array.isArray(candidates)||!candidates.length){notice('无法找到对应 ERP 项目','本张标签尚未计入。','bad');return}
+ pendingERPScan={raw,candidates:candidates.map(keyOf)};
+ const rows=candidates.map((r,i)=>'<div class="choice-row"><div><strong>'+safe(r.name||r.part)+'</strong> <span class="choice-hint">品名/批号/净重符合 ERP</span><div class="muted">'+safe(r.part)+' · '+safe(r.lot)+' · ERP '+displayNumber(r.quantity)+' KG<br>'+safe(r.warehouse)+' / '+safe(r.location)+'</div></div><button type="button" class="btn primary" data-erp-choice="'+i+'">'+safe(tr('选择并计入 / Count here'))+'</button></div>').join('');
  const pane=$('erpChoicePanel');pane.classList.remove('hide');
- pane.innerHTML='<div class="choice-title">'+safe(tr('⚠ 同一料号与批号对应多个 ERP 储位 / Select ERP Row'))+'</div><div class="muted">Label '+safe(scan.label)+' · '+safe(scan.part)+' / '+safe(scan.lot)+' · QR Net '+displayNumber(scan.weight)+' KG</div><p>'+safe(tr('QR 标签上的旧仓库、旧储位不参与比对。请核对实物对应的 ERP 库存项目；选择后只计入一次，不用重新扫码。'))+'</p>'+rows+'<button type="button" class="btn" id="cancelErpChoice">'+safe(tr('取消 / Cancel'))+'</button>';
- notice('⚠ 请选择 ERP 库存项目','这笔扫描尚未保存或计重。选择其中一笔 ERP 记录后才会完成盘点。','warn');
+ pane.innerHTML='<div class="choice-title">'+safe(tr('同样品名、批号、数量出现多个 ERP 项目'))+'</div><div class="muted">Label '+safe(scan.label)+' · '+safe(scan.part)+' / '+safe(scan.lot)+' · '+displayNumber(scan.weight)+' KG</div><p>'+safe(tr('选择实际对应的 ERP 库存行；不同标签重量不能累计。QR 仓库/储位不参与匹配。'))+'</p>'+rows+'<button type="button" class="btn" id="cancelErpChoice">'+safe(tr('取消 / Cancel'))+'</button>';
+ notice('⚠ 请选择准确的 ERP 项目','本次尚未计入；需要人工确认同数量不同储位的 ERP 行。','warn');
  pane.scrollIntoView?.({block:'nearest',behavior:'smooth'});
 }
 async function confirmERPChoice(index){
@@ -263,8 +263,36 @@ async function confirmERPChoice(index){
 }
 
 const COUNTABLE_STATUSES=new Set(['accepted','counted_variance','counted_multi']);
-const isCounted=h=>COUNTABLE_STATUSES.has(h.status);
 function countedKey(h){return keyOf({part:h.part,lot:h.lot,warehouse:h.erpWarehouse||h.warehouse,location:h.erpLocation||h.location})}
+let eligibilityCache={history:null,inventory:null,len:-1,last:null,set:new Set()};
+function approvedScans(){
+ const h=state.history,last=h[h.length-1],c=eligibilityCache;
+ if(c.history===h&&c.inventory===state.inventory&&c.len===h.length&&c.last===last)return c.set;
+ const inventory=new Map(state.inventory.map(r=>[keyOf(r),r]));
+ const labels=new Set(),rows=new Set(),approved=new Set();
+ for(const record of h){
+  if(!COUNTABLE_STATUSES.has(record.status))continue;
+  const row=inventory.get(countedKey(record));
+  if(!row||cleanCode(record.part)!==row.part||cleanCode(record.lot)!==row.lot||Math.abs(round3(Number(record.weight)-row.quantity))>TOLERANCE)continue;
+  if(rows.has(keyOf(row))||labels.has(record.label))continue;
+  rows.add(keyOf(row));labels.add(record.label);approved.add(record);
+ }
+ eligibilityCache={history:h,inventory:state.inventory,len:h.length,last,set:approved};return approved;
+}
+function isCounted(record){
+ if(!COUNTABLE_STATUSES.has(record.status))return false;
+ const approved=approvedScans();
+ if(approved.has(record))return true;
+ // The cloud insert response is a fresh object, not the loaded row. Match only
+ // when its label is already present in the newly reloaded approved history.
+ if(state.history.includes(record))return false;
+ return [...approved].some(h=>h.label===record.label&&countedKey(h)===countedKey(record)&&round3(h.weight)===round3(record.weight));
+}
+function recordStatus(h){
+ if(h.quantityMismatch||h.status==='mismatch'&&h.message?.includes('数量'))return ['数量不符','bad'];
+ if(COUNTABLE_STATUSES.has(h.status)&&!isCounted(h))return ['旧记录需复核','bad'];
+ return statusInfo(h.status);
+}
 function evaluateScan(scan,actual,chosenKey=null){
  const found=erpCandidate(scan,actual,chosenKey),row=found.row;
  if(!row)return {...found,details:[found.reason],positionChecks:null};
@@ -278,7 +306,7 @@ function evaluateScan(scan,actual,chosenKey=null){
  if(multiple)details.push('实际记录多个储位：'+locationText(actual.locations)+'；本张标签尚未指定唯一实际储位，重量只计一次');
  const status=multiple?'counted_multi':erpInActual?'accepted':'counted_variance';
  const reason=details.length?details.join('；'):'料号、批号符合 ERP，实物位置与 ERP 一致；QR 标签旧仓库/储位仅作记录';
- return {row,status,details,reason:found.assignment==='manual'?'人工选择 ERP 项目；'+reason:found.assignment==='weight'?'标签净重与 ERP 剩余数量唯一对应；'+reason:reason,positionChecks:{erpInActual,erpWarehouseMatch,qrInActual:null,extraLocations,actualCount:actual.locations.length}};
+ return {row,status,details,reason:(found.assignment==='manual'?'人工选择 ERP 项目；':'')+'ERP 品名 '+row.name+'、批号 '+row.lot+'、单笔数量 '+displayNumber(row.quantity)+' KG 符合 QR；'+reason,positionChecks:{erpInActual,erpWarehouseMatch,qrInActual:null,extraLocations,actualCount:actual.locations.length}};
 }
 function renderComparison(record){
  const el=$('scanComparison');if(!record){el.classList.add('hide');el.innerHTML='';return}
@@ -296,8 +324,33 @@ function renderComparison(record){
  el.innerHTML='<div class="comparison-title">'+safe(tr('ERP × 实际位置（QR 仅供识别）'))+'</div><div class="scrolltable"><table class="data-table"><thead><tr><th>'+safe(tr('比对字段'))+'</th><th>'+safe(tr('ERP 系统'))+'</th><th>'+safe(tr('QR 标签（仅参考）'))+'</th><th>'+safe(tr('实际位置'))+'</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+flags+'<div class="comparison-detail">'+safe(tr(record.message||''))+' · Label '+safe(record.label||'—')+' · '+safe(record.part||'—')+' / '+safe(record.lot||'—')+'</div>';
  el.classList.remove('hide');
 }
-function scannedSum(){let map=new Map();for(let h of state.history){if(!isCounted(h))continue;let k=countedKey(h);map.set(k,{sum:round3((map.get(k)?.sum||0)+h.weight),count:(map.get(k)?.count||0)+1})}return map}
+function scannedSum(){let map=new Map();for(const h of state.history){if(!isCounted(h))continue;const k=countedKey(h);if(map.has(k))continue;map.set(k,{sum:round3(h.weight),count:1})}return map}
 function classify(row,counted){let diff=round3(counted-row.quantity);if(counted===0)return'pending';if(Math.abs(diff)<=TOLERANCE)return'done';if(diff<0)return'short';return'over'}
+// ERP inventory quantity is the authority for completion. Scan *presence* is
+// not the same as quantity MATCH: multiple labels may fill one ERP inventory row.
+// Derive the running balance for every counted label, including old saved/cloud
+// records. A later label can clear an earlier shortage; deleting a label updates
+// the history and reconciliation together.
+function historicalQuantityChecks(){
+ const rows=new Map(state.inventory.map(r=>[keyOf(r),r]));
+ return state.history.map(h=>{
+  const row=rows.get(countedKey(h));
+  if(!row)return {status:'unmatched',erp:null,scanned:0,diff:null};
+  const valid=isCounted(h),actual=Number(h.weight)||0,diff=round3(actual-row.quantity);
+  return {status:valid?'done':'mismatch',erp:row.quantity,scanned:valid?actual:0,diff,actual,valid};
+ });
+}
+function scanQuantityPill(record,check){
+ const [label,cl]=recordStatus(record);
+ return '<span class="pill '+cl+'">'+safe(label)+'</span>';
+}
+function countedQuantityNotice(record,row,counted){
+ const posDiff=record.status!=='accepted';
+ notice('✓ 完成 / MATCH · ERP 单笔数量符合',
+  '品名：'+row.name+' · 批号：'+row.lot+' · ERP：'+displayNumber(row.quantity)+' KG · QR：'+displayNumber(record.weight)+' KG · Label '+record.label+(posDiff?'；ERP 与实际位置另行记录差异（不影响数量匹配）。':''),
+  posDiff?'warn':'good');
+ window.StockTakeSound?.play(posDiff?'warning':'success');navigator.vibrate?.(posDiff?[60,70,60]:75);
+}
 async function performScan(raw,chosenKey=null){
  if(window.TMCCloud?.isActive()){try{await window.TMCCloud.insertScan(raw,chosenKey)}catch(e){window.StockTakeSound?.play('error');notice('⚠ 云端扫描未保存',e.message+'。请检查网络并重新扫描，避免遗漏。','bad');msg('云端保存失败：'+e.message)}return}
  if(!state.inventory.length){window.StockTakeSound?.play('error');notice('请先导入 ERP 报表','尚未读取库存清单，无法比对扫描标签。','warn');return}
@@ -317,28 +370,23 @@ async function performScan(raw,chosenKey=null){
  if(result.status==='ambiguous'&&result.candidates?.length){showERPChoice(raw,result.candidates);window.StockTakeSound?.play('warning');return}
  closeERPChoice();
  record={...scan,id:state.nextId++,at:now(),actualWarehouse:actual.warehouse,actualLocation:actual.location,actualLocations:actual.locations,positionChecks:result.positionChecks||null,
-         erpWarehouse:result.row?.warehouse||'',erpLocation:result.row?.location||'',status:result.status,message:result.reason};
+         erpWarehouse:result.row?.warehouse||'',erpLocation:result.row?.location||'',status:result.status,quantityMismatch:!!result.quantityMismatch,message:result.reason};
  if(state.history.some(h=>h.label===scan.label&&h.label&&isCounted(h))){
   record.status='duplicate';record.message='Label '+scan.label+' 已完成盘点，重量不会重复计算';
  }
  state.history.push(record);await saveStore();render();renderComparison(record);
  if(isCounted(record)){
-  const row=result.row,c=scannedSum().get(keyOf(row))?.sum||0,stat=classify(row,c);
-  const label='Label '+record.label+' | 本张 '+displayNumber(record.weight)+' KG | 已累计 '+displayNumber(c)+' / ERP '+displayNumber(row.quantity)+' KG';
-  if(record.status==='accepted')notice(stat==='over'?'⚠ COUNTED · 数量超出':stat==='done'?'✓ COUNTED · 数量完成':'✓ COUNTED · 已计入盘点',label,stat==='over'?'warn':'good');
-  else if(record.status==='counted_variance')notice('✓ COUNTED · ERP 位置差异 / LOCATION VARIANCE',label+'。'+record.message+'；已计入盘点，储位调整请另行核查。','warn');
-  else notice('✓ COUNTED · 多储位待确认 / MULTIPLE LOCATIONS',label+'。'+record.message+'；已计入盘点，具体储位需人工核对。','warn');
-  window.StockTakeSound?.play(record.status==='accepted'?'success':'warning');
-  navigator.vibrate?.(record.status==='accepted'?80:[60,70,60]);
+  const row=result.row,c=scannedSum().get(keyOf(row))?.sum||0;
+  countedQuantityNotice(record,row,c);
  }else if(record.status==='duplicate'){window.StockTakeSound?.play('duplicate');notice('重复标签 / DUPLICATE',record.message,'warn')}
- else if(record.status==='ambiguous'){window.StockTakeSound?.play('error');notice('⚠ ERP 项目无法唯一对应',record.message+'。请确认正确仓库或缩小储位清单后重扫；本次未计重。','bad')}
- else{window.StockTakeSound?.play('error');notice('⚠ ERP 无匹配记录',record.message+'。未计入盘点重量。','bad')}
+ else if(record.status==='duplicate'){window.StockTakeSound?.play('duplicate');notice('重复盘点 / DUPLICATE',record.message,'warn')}
+ else{window.StockTakeSound?.play('error');notice(record.quantityMismatch?'✗ ERP 数量不符 / QUANTITY MISMATCH':'⚠ ERP 核对未通过',record.message+'；本次未计入有效盘点。','bad')}
 
 }
-function statusInfo(k){let st={done:['完成','ok'],pending:['未盘点','wait'],short:['数量不足','short'],over:['超出','over'],accepted:['COUNTED','ok'],counted_variance:['已盘点·位置差异','short'],counted_multi:['已盘点·多储位','short'],duplicate:['重复','short'],unmatched:['ERP无记录','bad'],invalid:['QR错误','bad'],mismatch:['旧版位置差异·待复盘','bad'],ambiguous:['ERP多位置','bad'],legacy:['旧版待复盘','wait']}[k]||['异常','bad'];return [tr(st[0]),st[1]]}
+function statusInfo(k){let st={done:['完成','ok'],pending:['未盘点','wait'],short:['数量不足','short'],over:['超出','over'],accepted:['COUNTED','ok'],counted_variance:['已盘点·位置差异','short'],counted_multi:['已盘点·多储位','short'],duplicate:['重复','short'],unmatched:['ERP无记录','bad'],invalid:['QR错误','bad'],mismatch:['需复核','bad'],ambiguous:['ERP多位置','bad'],legacy:['旧版待复盘','wait']}[k]||['异常','bad'];return [tr(st[0]),st[1]]}
 function pill(k){let [label,cl]=statusInfo(k);return '<span class="pill '+cl+'">'+label+'</span>'}
 function render(){const sums=scannedSum(),total=state.inventory.length,items=state.inventory.map(r=>{const s=sums.get(keyOf(r))||{sum:0,count:0};return {...r,scanned:s.sum,count:s.count,difference:round3(s.sum-r.quantity),status:classify(r,s.sum)}});
- let done=items.filter(x=>x.status==='done').length,over=items.filter(x=>x.status==='over').length,exceptions=state.history.filter(h=>h.status!=='accepted').length;
+ let done=items.filter(x=>x.status==='done').length,over=items.filter(x=>x.status==='over').length,exceptions=state.history.filter(h=>!isCounted(h)||h.status!=='accepted').length;
  $('countTotal').textContent=total;$('countDone').textContent=done;$('countPending').textContent=items.filter(x=>x.status==='pending'||x.status==='short').length;
  $('countIssues').textContent=over+exceptions;$('countScans').textContent=state.history.filter(isCounted).length;
  $('progressFill').style.width=(total?done/total*100:0)+'%';$('progressLabel').textContent='完成率 '+(total?Math.round(done/total*100):0)+'%（'+done+' / '+total+' 项）';
@@ -348,9 +396,10 @@ function render(){const sums=scannedSum(),total=state.inventory.length,items=sta
  $('tableSummary').textContent=filtered.length+' / '+total+' 项记录';
  $('inventoryBody').innerHTML=filtered.length?filtered.slice(0,1500).map(r=>'<tr><td>'+pill(r.status)+'</td><td>'+safe(r.part)+'</td><td class="namecol">'+safe(r.name)+'</td><td>'+safe(r.spec)+'</td><td>'+safe(r.warehouse)+'</td><td>'+safe(r.location)+'</td><td>'+safe(r.lot)+'</td><td class="num">'+displayNumber(r.quantity)+'</td><td class="num">'+displayNumber(r.scanned)+'</td><td class="num '+(r.difference<0?'amber-text':r.difference>0?'red-text':'green-text')+'">'+displayNumber(r.difference)+'</td><td>'+r.count+'</td></tr>').join(''):'<tr><td colspan="11" class="blank">'+(total?'目前筛选没有项目':'请先导入 ERP 报表')+'</td></tr>';
  if(filtered.length>1500)$('tableSummary').textContent+='（画面只显示前 1500 项，导出包含全部）';
- let histFilter=$('historyFilter').value;let history=state.history.filter(h=>histFilter==='all'||(histFilter==='accepted'?isCounted(h):h.status!=='accepted')).slice().reverse();
+ let histFilter=$('historyFilter').value;let history=state.history.filter(h=>histFilter==='all'||(histFilter==='accepted'?isCounted(h):!isCounted(h)||h.status!=='accepted')).slice().reverse();
+ const qtyChecks=historicalQuantityChecks(),historyCheckMap=new Map(state.history.map((r,i)=>[r.id,qtyChecks[i]]));
  $('historySummary').textContent=history.length+' 笔记录';
- $('historyBody').innerHTML=history.length?history.slice(0,500).map(h=>'<tr><td>'+safe(h.at)+'</td><td>'+pill(h.status)+'</td><td>'+safe(h.label)+'</td><td>'+safe(h.part)+'</td><td>'+safe(h.warehouse)+'</td><td>'+safe(h.location)+'</td><td>'+safe(h.actualWarehouse||'—')+'</td><td>'+safe(h.actualLocation||'—')+'</td><td>'+safe(h.erpWarehouse||'—')+'</td><td>'+safe(h.erpLocation||'—')+'</td><td>'+safe(h.lot)+'</td><td class="num">'+(Number.isFinite(h.weight)?displayNumber(h.weight):'—')+'</td><td class="namecol">'+safe(tr(h.message))+'</td><td><button class="btn small-btn danger" data-delete-id="'+h.id+'">'+tr('删除')+'</button></td></tr>').join(''):'<tr><td colspan="14" class="blank">暂无扫描记录</td></tr>';
+ $('historyBody').innerHTML=history.length?history.slice(0,500).map(h=>'<tr><td>'+safe(h.at)+'</td><td>'+scanQuantityPill(h,historyCheckMap.get(h.id))+'</td><td>'+safe(h.label)+'</td><td>'+safe(h.part)+'</td><td>'+safe(h.warehouse)+'</td><td>'+safe(h.location)+'</td><td>'+safe(h.actualWarehouse||'—')+'</td><td>'+safe(h.actualLocation||'—')+'</td><td>'+safe(h.erpWarehouse||'—')+'</td><td>'+safe(h.erpLocation||'—')+'</td><td>'+safe(h.lot)+'</td><td class="num">'+(Number.isFinite(h.weight)?displayNumber(h.weight):'—')+'</td><td class="namecol">'+safe(tr(h.message))+(historyCheckMap.get(h.id)&&historyCheckMap.get(h.id).erp!==null?' · ERP '+displayNumber(historyCheckMap.get(h.id).erp)+' KG / 标签 '+displayNumber(h.weight)+' KG / 差异 '+displayNumber(historyCheckMap.get(h.id).diff)+' KG':'')+'</td><td><button class="btn small-btn danger" data-delete-id="'+h.id+'">'+tr('删除')+'</button></td></tr>').join(''):'<tr><td colspan="14" class="blank">暂无扫描记录</td></tr>';
  if(history.length>500)$('historySummary').textContent+='（仅显示最新 500 笔，导出包含全部）';
 }
 function revokeUrl(blob,name){let url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000)}
@@ -367,7 +416,7 @@ function matchedActualPosition(r,history){
  return matches.length?wh+'/'+loc:'';
 }
 function locationExceptionCount(r,history){
- return history.filter(h=>cleanCode(h.part)===cleanCode(r.part)&&cleanCode(h.lot)===cleanCode(r.lot)
+ return history.filter(h=>isCounted(h)&&cleanCode(h.part)===cleanCode(r.part)&&cleanCode(h.lot)===cleanCode(r.lot)
    &&cleanCode(h.erpWarehouse)===cleanCode(r.warehouse)&&cleanCode(h.erpLocation)===cleanCode(r.location)
    &&['counted_variance','counted_multi','mismatch'].includes(h.status)).length;
 }
@@ -406,25 +455,25 @@ function sheetXML(data,widths,opts={}){
 }
 async function exportExcel(){if(!state.inventory.length){msg('请先导入 ERP 报表');return}
  try{
- const rows=exportRows(),history=state.history;
+ const rows=exportRows(),history=state.history,qtyChecks=historicalQuantityChecks();
  const counts={done:rows.filter(r=>r.status==='done').length,pending:rows.filter(r=>r.status==='pending').length,short:rows.filter(r=>r.status==='short').length,over:rows.filter(r=>r.status==='over').length};
- const summary=[['Stock Take Summary','Value'],['ERP file',state.reportName],['Import time',state.importedAt],['Export time',now()],['ERP inventory lines',rows.length],['Completed',counts.done],['Not yet counted',counts.pending],['Quantity short',counts.short],['Over quantity',counts.over],['Counted scans (incl. location variance)',history.filter(isCounted).length],['Records requiring review',history.filter(h=>h.status!=='accepted').length],['Counted location variances',history.filter(h=>h.status==='counted_variance').length],['Counted multi-location groups',history.filter(h=>h.status==='counted_multi').length],['Ambiguous ERP row',history.filter(h=>h.status==='ambiguous').length],['V1.0 legacy scans requiring recheck',history.filter(h=>h.status==='legacy').length],['Quantity tolerance (kg)',TOLERANCE],['Source',window.TMCCloud?.isActive()?'Supabase cloud':'Local browser data'],['Multiple actual rack groups',history.filter(h=>h.actualLocations?.length>1&&h.status!=='duplicate').length],['Note','For multi-rack labels, Net KG is counted ONCE per label, NOT repeated per rack.']];
+ const summary=[['Stock Take Summary','Value'],['ERP file',state.reportName],['Import time',state.importedAt],['Export time',now()],['ERP inventory lines',rows.length],['Completed',counts.done],['Not yet counted',counts.pending],['Unmatched single label quantities',history.filter(h=>recordStatus(h)[0]==='数量不符').length],['Over quantity',counts.over],['Counted scans (incl. location variance)',history.filter(isCounted).length],['Records requiring review',history.filter(h=>!isCounted(h)||h.status!=='accepted').length],['Counted location variances',history.filter(h=>isCounted(h)&&h.status==='counted_variance').length],['Counted multi-location groups',history.filter(h=>isCounted(h)&&h.status==='counted_multi').length],['Ambiguous ERP row',history.filter(h=>h.status==='ambiguous').length],['Older scans requiring recheck',history.filter(h=>COUNTABLE_STATUSES.has(h.status)&&!isCounted(h)).length],['Quantity tolerance (kg)',TOLERANCE],['Source',window.TMCCloud?.isActive()?'Supabase cloud':'Local browser data'],['Multiple actual rack groups',history.filter(h=>h.actualLocations?.length>1&&h.status!=='duplicate').length],['Note','Strict ONE ERP row = ONE label. Part No. identifies ERP Description, then Lot and exact single-line Net KG must match. No accumulation.']];
  const rec=[['状态 Status','料件編號 Part No.','品名 Description','規格 Spec','倉庫 Warehouse','儲位 Location','批號 Lot','ERP Qty (KG)','Scanned Qty (KG)','Variance (KG)','Scanned Labels','Location Exception Labels','Actual Warehouse / Location (Exceptions)'],...rows.map(r=>[statusInfo(r.status)[0],r.part,r.name,r.spec,r.warehouse,r.location,r.lot,r.quantity,r.scanned,r.difference,r.count,locationExceptionCount(r,history),matchedActualPosition(r,history)])];
- const scan=[['Scanned At','Status','Label No.','Part No.','Lot No.','QR Warehouse (reference)','QR Location (reference)','Actual Warehouse','Actual Locations (all)','ERP Warehouse','ERP Location','ERP in Actual','QR location not compared','Additional Locations','Net Weight (KG)','Reason','Raw QR'],...history.map(h=>[h.at,statusInfo(h.status)[0],h.label||'',h.part||'',h.lot||'',h.warehouse||'',h.location||'',h.actualWarehouse||'',h.actualLocation||'',h.erpWarehouse||'',h.erpLocation||'',h.positionChecks?(h.positionChecks.erpInActual?'YES':'NO'):'','NOT COMPARED',h.positionChecks?.extraLocations?.join(', ')||'',Number.isFinite(h.weight)?h.weight:'',tr(h.message||''),h.raw||''])];
- const exception=[['Type','Scan Time','Label No.','Part No.','Lot No.','QR Warehouse (reference)','QR Location (reference)','Actual Warehouse','Actual Locations (all)','ERP Warehouse','ERP Location','ERP in Actual','QR location not compared','Additional Locations','Net Weight (KG)','Note'],...history.filter(h=>h.status!=='accepted').map(h=>[statusInfo(h.status)[0],h.at,h.label||'',h.part||'',h.lot||'',h.warehouse||'',h.location||'',h.actualWarehouse||'',h.actualLocation||'',h.erpWarehouse||'',h.erpLocation||'',h.positionChecks?(h.positionChecks.erpInActual?'YES':'NO'):'','NOT COMPARED',h.positionChecks?.extraLocations?.join(', ')||'',Number.isFinite(h.weight)?h.weight:'',tr(h.message||'')])];
+ const scan=[['Scanned At','Status','Label No.','Part No.','Lot No.','QR Warehouse (reference)','QR Location (reference)','Actual Warehouse','Actual Locations (all)','ERP Warehouse','ERP Location','ERP in Actual','QR location not compared','Additional Locations','Net Weight (KG)','Reason','Raw QR','ERP Quantity (KG)','Matched Single Label Qty (KG)','QR minus ERP (KG)','Exact Quantity Result'],...history.map((h,i)=>[h.at,recordStatus(h)[0],h.label||'',h.part||'',h.lot||'',h.warehouse||'',h.location||'',h.actualWarehouse||'',h.actualLocation||'',h.erpWarehouse||'',h.erpLocation||'',h.positionChecks?(h.positionChecks.erpInActual?'YES':'NO'):'','NOT COMPARED',h.positionChecks?.extraLocations?.join(', ')||'',Number.isFinite(h.weight)?h.weight:'',tr(h.message||''),h.raw||'',qtyChecks[i]?.erp??'',qtyChecks[i]?.scanned??'',qtyChecks[i]?.diff??'',qtyChecks[i]?(qtyChecks[i].valid?'MATCH':'NOT MATCHED'):''])];
+ const exception=[['Type','Scan Time','Label No.','Part No.','Lot No.','QR Warehouse (reference)','QR Location (reference)','Actual Warehouse','Actual Locations (all)','ERP Warehouse','ERP Location','ERP in Actual','QR location not compared','Additional Locations','Net Weight (KG)','Note','ERP Quantity (KG)','Matched Single Label Qty (KG)','Exact Quantity Result'],...history.map((h,i)=>({...h,_qtyCheck:qtyChecks[i]})).filter(h=>!isCounted(h)||h.status!=='accepted').map(h=>[recordStatus(h)[0],h.at,h.label||'',h.part||'',h.lot||'',h.warehouse||'',h.location||'',h.actualWarehouse||'',h.actualLocation||'',h.erpWarehouse||'',h.erpLocation||'',h.positionChecks?(h.positionChecks.erpInActual?'YES':'NO'):'','NOT COMPARED',h.positionChecks?.extraLocations?.join(', ')||'',Number.isFinite(h.weight)?h.weight:'',tr(h.message||''),h._qtyCheck?.erp??'',h._qtyCheck?.scanned??'',h._qtyCheck?(h._qtyCheck.valid?'MATCH':'NOT MATCHED'):''])];
  const actualSummary=[['Actual Warehouse','Actual Racking No. (group, not split weight)','Part No.','Lot No.','Labels Scanned','Physical Weight (KG)','Counted Weight (KG)','Exception Weight (KG)','Statuses'],...(()=>{
    const map=new Map(),seenLabels=new Set();for(const h of history){if(!h.part||!h.actualWarehouse||!h.actualLocation||!Number.isFinite(h.weight)||h.status==='duplicate'||h.status==='legacy')continue;
      if(h.label&&seenLabels.has(h.label))continue;if(h.label)seenLabels.add(h.label);
      const key=[h.actualWarehouse,h.actualLocation,h.part,h.lot].join('\u001f');if(!map.has(key))map.set(key,{wh:h.actualWarehouse,loc:h.actualLocation,part:h.part,lot:h.lot,labels:new Set(),weight:0,accepted:0,exception:0,statuses:new Set()});
-     const x=map.get(key);if(x.labels.has(h.label))continue;x.labels.add(h.label);x.weight=round3(x.weight+h.weight);if(isCounted(h))x.accepted=round3(x.accepted+h.weight);else x.exception=round3(x.exception+h.weight);x.statuses.add(statusInfo(h.status)[0]);
+     const x=map.get(key);if(x.labels.has(h.label))continue;x.labels.add(h.label);x.weight=round3(x.weight+h.weight);if(isCounted(h))x.accepted=round3(x.accepted+h.weight);else x.exception=round3(x.exception+h.weight);x.statuses.add(recordStatus(h)[0]);
    }return [...map.values()].map(x=>[x.wh,x.loc,x.part,x.lot,x.labels.size,x.weight,x.accepted,x.exception,[...x.statuses].join(', ')]);
   })()];
   const locationsDetail=[['Scanned At','Label No.','Part No.','Lot No.','Actual Warehouse','One of Actual Locations','ERP Location Exact','QR Location (not compared)','Status','Note (Weight)'],
    ...history.filter(h=>h.actualWarehouse&&h.actualLocation&&h.status!=='duplicate').flatMap(h=>parseActualLocations(h.actualLocations?.length?h.actualLocations:h.actualLocation).map(loc=>[
-     h.at||'',h.label||'',h.part||'',h.lot||'',h.actualWarehouse,loc,(h.actualWarehouse===h.erpWarehouse&&loc===h.erpLocation)?'YES':'NO','NOT COMPARED',statusInfo(h.status)[0],'Location reference only. Net KG is NOT allocated to each rack.'
+     h.at||'',h.label||'',h.part||'',h.lot||'',h.actualWarehouse,loc,(h.actualWarehouse===h.erpWarehouse&&loc===h.erpLocation)?'YES':'NO','NOT COMPARED',recordStatus(h)[0],'Location reference only. Net KG is NOT allocated to each rack.'
    ]))];
-  const locationVariance=[['Scanned At','Label No.','Part No.','Lot No.','ERP Warehouse','ERP Location','Actual Warehouse','Actual Rack Group','Location Finding','Counted Weight (KG)','Follow-up'],...history.filter(h=>['counted_variance','counted_multi'].includes(h.status)).map(h=>[h.at,h.label||'',h.part||'',h.lot||'',h.erpWarehouse||'',h.erpLocation||'',h.actualWarehouse||'',h.actualLocation||'',statusInfo(h.status)[0],Number.isFinite(h.weight)?h.weight:'',tr(h.message||'')])];
- const sheets=[['LocationVariance',locationVariance,[24,18,23,22,21,21,21,45,28,24,80],{textColumns:[2,3]}],['Summary',summary,[29,53]],['Reconciliation',rec,[17,23,43,40,16,18,22,18,20,20,16,20,38],{textColumns:[1,6],statusKeys:rows.map(r=>r.status)}],['ScanHistory',scan,[23,17,17,21,19,16,18,18,35,18,18,17,17,31,19,60,65],{textColumns:[2,3,4]}],['Exceptions',exception,[18,24,17,21,19,18,18,18,35,18,18,17,17,31,20,72],{textColumns:[2,3,4]}],['ActualLocations',actualSummary,[21,44,21,19,19,21,26,25,30],{textColumns:[2,3]}],['LocationDetails',locationsDetail,[22,17,21,18,20,26,22,22,18,66],{textColumns:[1,2,3]}]];
+  const locationVariance=[['Scanned At','Label No.','Part No.','Lot No.','ERP Warehouse','ERP Location','Actual Warehouse','Actual Rack Group','Location Finding','Counted Weight (KG)','Follow-up'],...history.filter(h=>isCounted(h)&&['counted_variance','counted_multi'].includes(h.status)).map(h=>[h.at,h.label||'',h.part||'',h.lot||'',h.erpWarehouse||'',h.erpLocation||'',h.actualWarehouse||'',h.actualLocation||'',recordStatus(h)[0],Number.isFinite(h.weight)?h.weight:'',tr(h.message||'')])];
+ const sheets=[['LocationVariance',locationVariance,[24,18,23,22,21,21,21,45,28,24,80],{textColumns:[2,3]}],['Summary',summary,[29,53]],['Reconciliation',rec,[17,23,43,40,16,18,22,18,20,20,16,20,38],{textColumns:[1,6],statusKeys:rows.map(r=>r.status)}],['ScanHistory',scan,[23,17,17,21,19,16,18,18,35,18,18,17,17,31,19,60,65,23,25,25,22],{textColumns:[2,3,4]}],['Exceptions',exception,[18,24,17,21,19,18,18,18,35,18,18,17,17,31,20,72,20,24,22],{textColumns:[2,3,4]}],['ActualLocations',actualSummary,[21,44,21,19,19,21,26,25,30],{textColumns:[2,3]}],['LocationDetails',locationsDetail,[22,17,21,18,20,26,22,22,18,66],{textColumns:[1,2,3]}]];
  const zip=new JSZip();
  zip.file('[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'+sheets.map((_,i)=>'<Override PartName="/xl/worksheets/sheet'+(i+1)+'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join('')+'</Types>');
  zip.file('_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
@@ -539,7 +588,7 @@ window.StockTakeCore={
     const already=state.history.some(h=>h.label===scan.label&&h.label&&isCounted(h));
     const result=already?{row:null,status:'duplicate',reason:'Label '+scan.label+' 已有盘点记录，重量不会重复计算'}:evaluateScan(scan,actual,chosenKey);
     if(result.status==='ambiguous'&&result.candidates?.length)return {requiresSelection:true,candidates:result.candidates};
-    record={...scan,id:0,at:now(),actualWarehouse:actual.warehouse,actualLocation:actual.location,actualLocations:actual.locations,positionChecks:result.positionChecks||null,erpWarehouse:result.row?.warehouse||'',erpLocation:result.row?.location||'',status:result.status,message:result.reason};
+    record={...scan,id:0,at:now(),actualWarehouse:actual.warehouse,actualLocation:actual.location,actualLocations:actual.locations,positionChecks:result.positionChecks||null,erpWarehouse:result.row?.warehouse||'',erpLocation:result.row?.location||'',status:result.status,quantityMismatch:!!result.quantityMismatch,message:result.reason};
     if(state.history.some(h=>h.label===scan.label&&h.label&&isCounted(h))){
       record.status='duplicate';record.message='Label '+scan.label+' 已有盘点记录，重量不会重复计算';
     }
@@ -551,12 +600,10 @@ window.StockTakeCore={
       const sums=scannedSum(),row=state.inventory.find(r=>keyOf(r)===countedKey(record));
       const counted=sums.get(countedKey(record))?.sum||0;
       const stat=row?classify(row,counted):'';
-      const title=record.status==='accepted'?'✓ COUNTED · 云端已计入':record.status==='counted_multi'?'✓ COUNTED · 多储位待确认':'✓ COUNTED · ERP 位置差异';
-      notice(title,'Label '+record.label+' · '+displayNumber(record.weight)+' KG · '+(row?'已累计 '+displayNumber(counted)+' / ERP '+displayNumber(row.quantity)+' KG':'云端已保存')+(record.status==='accepted'?'':' · '+record.message),record.status==='accepted'?'good':'warn');
-      window.StockTakeSound?.play(record.status==='accepted'?'success':'warning');
-      navigator.vibrate?.(record.status==='accepted'?75:[60,70,60]);
+      if(row)countedQuantityNotice(record,row,counted);
+      else{notice('⚠ ERP 匹配需复查','云端已保存标签，但当前 ERP 无对应库存项目，请核查。','bad');window.StockTakeSound?.play('error')}
     }else if(record.status==='duplicate'){window.StockTakeSound?.play('duplicate');notice('重复标签 / DUPLICATE',record.message,'warn')}
-    else{window.StockTakeSound?.play('error');notice('⚠ 扫描待核对 / SCAN EXCEPTION',record.message||record.status,'bad')}
+    else{window.StockTakeSound?.play('error');notice(record.quantityMismatch?'✗ ERP 数量不符 / QUANTITY MISMATCH':'⚠ 扫描待核对 / SCAN EXCEPTION',record.message||record.status,'bad')}
   }
 };
 window.StockTakeRender=()=>{render();updatePositionUI();window.StockTakeI18n?.apply()};

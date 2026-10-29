@@ -56,6 +56,21 @@ const raw = [
 ['。QR 标签仓库/储位可能是旧位置，仅保存作参考，不影响盘点计重。实际有多个储位时整组保存、重量只计一次，但不能自动指定到其中某一个储位。','. The QR warehouse and rack may be outdated, so they are recorded for reference and do not block counting. Multi-rack groups preserve the whole list and count weight once, without assigning it to one precise rack.'],
 ['导入 ERP → 确认实际位置 → 扫描 QR（识别料号/批号/重量）→ ERP 与实际位置核查','Import ERP → Confirm actual location → Scan QR part/lot/weight → Compare ERP with actual'],
 
+['ERP 数量为完成盘点的判断标准：累计扫描重量低于 ERP 数量显示「数量不足」，相等才显示「完成」，超出则显示「超出」。旧 QR 储位仅作参考。','ERP quantity determines completion. Below ERP quantity: Short; exact match: Completed; above ERP quantity: Over. Old QR rack is for reference only.'],
+// V1.3.8 exact ERP single-row matching (NO summation)
+['数量不符','Quantity Mismatch'],
+['旧记录需复核','Old Record: Review Required'],
+['同样品名、批号、数量出现多个 ERP 项目','Multiple ERP Rows with the Same Description, Lot and Weight'],
+['选择实际对应的 ERP 库存行；不同标签重量不能累计。QR 仓库/储位不参与匹配。','Select the exact ERP inventory row. Do not combine weights from separate labels. Printed QR warehouse/location are ignored.'],
+['本次尚未计入；需要人工确认同数量不同储位的 ERP 行。','Not counted yet: choose the matching ERP row when locations differ.'],
+
+// V1.3.8 ERP quantity check: do not show complete until scan total equals ERP.
+['数量符合 · 完成 / MATCH','Quantity Match · Completed'],
+
+
+['ERP 数量核对','ERP Quantity Verification'],
+
+
 // V1.3.2 location verification + scan sound
 ['实际储位 / Actual Racking No. (multiple allowed) *','Actual Racking No. (multiple allowed) *'],
 ['可同时输入多个实际储位，以逗号、分号或换行分隔。每张标签的净重只记一次。','Enter several actual rack locations separated by commas, semicolons or line breaks. Weight counts once per label.'],
