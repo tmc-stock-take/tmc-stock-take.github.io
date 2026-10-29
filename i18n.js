@@ -1,10 +1,122 @@
-/* Stock Take V1.3.7: bilingual UI. UI translations never modify inventory or scan data. */
+/* Stock Take V1.3.12: complete English UI and messages. Imported ERP values remain unchanged. */
 (function(){
 'use strict';
 const KEY='tmc_stock_take_ui_lang_v1';
 let lang='zh';
 try{lang=localStorage.getItem(KEY)==='en'?'en':'zh';}catch(_){}
 const raw = [
+// V1.3.12: exact text for the position prompt; no mixed-language fragments
+["请先填写实际仓库（Actual Warehouse）及实际储位（Actual Location）；Racking / Row 为选填。完成后点击「确认当前盘点位置」。","Enter the Actual Warehouse and Actual Location. Racking and Row are optional. Click Confirm Current Location."],
+// V1.3.12 — complete English coverage, especially visible text and dynamic statuses
+["· 云端数据可在已登录设备之间同步；网络不可用时不会保存扫描。","· Cloud data syncs across signed-in devices; scans cannot be saved while offline."],
+["待盘点 / 未符合","Pending / Not Matched"],
+["实盘位置","Actual Stock Location"],
+["盘点总览","Stock Take Summary"],
+["请先导入报表","Please import an ERP report first"],
+["本机模式 · 如需手机电脑同步，请配置云端连接。","Local mode · Configure cloud sync for PC and phone."],
+["ERP 匹配需复查","ERP match needs review"],
+["云端已保存标签，但当前 ERP 无对应库存项目，请核查。","Scan saved in the cloud, but the current ERP report has no matching inventory row. Please verify."],
+["⚠ 扫描待核对 / SCAN EXCEPTION","⚠ Scan requires review"],
+["Label ","Label "],
+[" 已有盘点记录，重量不会重复计算"," has already been counted; net weight will not be counted twice"],
+["请先确认当前实际位置","Confirm your current actual stock location first"],
+["手动 Racking / Manual Racking（可选）","Manual Racking (optional)"],
+["手动 Row / Manual Row（可选）","Manual Row (optional)"],
+["☁ 电脑 ↔ 手机实时同步 / PC ↔ Phone Live Sync","☁ PC ↔ Phone Live Sync"],
+["⚙ 配置 / Setup","⚙ Setup"],
+["↻ 刷新 / Refresh","↻ Refresh"],
+["本机模式 / Local Mode","Local Mode"],
+["连接云端 / Connect","Connect to Cloud"],
+["首次连接：请先建立 Supabase 项目，在 SQL Editor 执行随附的 SQL，然后填写 Project URL 和 Publishable Key。请勿使用 secret 或 service_role key。","First-time setup: Create a Supabase project, run the included SQL in the SQL Editor, then enter your Project URL and publishable key. Do not use a secret or service_role key."],
+["电脑和手机请使用 ","Use the "],
+["同一个邮箱账号","same email account"],
+[" 登录，才能看到同一份 ERP 与扫描记录。"," on PC and phone to access the same ERP report and scan history."],
+["Email / 邮箱","Email"],
+["Password / 密码（至少 8 位）","Password (at least 8 characters)"],
+["Password / 密码","Password"],
+["登录 / Sign In","Sign In"],
+["注册 / Sign Up","Sign Up"],
+["注册后如需邮箱验证，请先确认邮件，再登录。If confirmation email is required, verify it first.","If email verification is required, confirm your email before signing in."],
+["注册后如需邮箱验证，请先确认邮件，再登录。","If email confirmation is required, verify your email before signing in."],
+["退出云端 / Sign Out","Sign Out"],
+["· 云端数据可在已登录设备之间同步；网络不可用时不会保存扫描。 / Data syncs across signed-in devices; scans do not save while offline.","· Cloud data syncs across signed-in devices; scans cannot be saved while offline."],
+["严格对照已上传 ERP：一张 QR 标签按料号找到 ERP 品名，批号与该笔库存数量必须相符才算完成。不同标签净重","Strict ERP matching: identify the item description by QR part number. The lot number and this label’s net weight must exactly match one ERP inventory row. Net weights from different labels are "],
+["不累计","not added together"],
+["；旧 QR 仓库、储位仅作参考。","; old warehouse and location information on QR labels is for reference only."],
+["逐笔显示 ERP 库存数量与独立标签重量；不累计","Compare each ERP inventory line with one QR label weight; no weight aggregation"],
+["逐笔显示 ERP 库存数量与独立标签重量；","Compare each ERP inventory line with a single QR label weight; "],
+["请先导入 ERP 报表","Please import an ERP report first"],
+["请先导入 ERP 报表，并确认实际盘点位置。","Import an ERP report and confirm the actual stock location before scanning."],
+["暂无扫描记录","No scan records yet"],
+["TMC Stock Take V1.3.12 · 本机模式仅存设备；登录云端后 ERP 与扫描数据存入 Supabase · 请定期导出 Excel/JSON 备份","TMC Stock Take V1.3.12 · Local mode saves only to this device; in cloud mode, ERP and scan data are stored in Supabase · Export Excel/JSON backups regularly"],
+["本机模式数据不会自动同步到云端；云端模式必须联网，扫描保存失败时请重新扫描。旧版位置异常记录不会自动转为已盘点，需重新扫描或核查。","Local data does not sync automatically. Cloud mode requires an internet connection; rescan failed saves. Legacy location exception records remain uncounted until rescanned or verified."],
+["Racking (手动)","Racking (manual)"],
+["Row (手动)","Row (manual)"],
+["Racking（手动备注）","Racking (manual note)"],
+["Row（手动备注）","Row (manual note)"],
+[" (备注)"," (note)"],
+["仅用于现场记录，不参与 ERP 仓库/储位、品名、批号和净重比对；也不影响盘点数量。","For on-site records only. Does not affect ERP matching, quantity verification or the stock take count."],
+["Manual Racking（可选）","Manual Racking (optional)"],
+["Manual Row（可选）","Manual Row (optional)"],
+["云端尚未导入 ERP 报表","No ERP report has been imported to the cloud"],
+["云端模式不直接恢复 JSON，请先退出云端并在本机模式恢复。","JSON backup cannot be restored in cloud mode. Sign out and restore it in local mode."],
+["需复核","Review Required"],
+["人工选择 ERP 项目；","ERP row selected manually; "],
+["ERP 品名 ","ERP description "],
+["、批号 ","; lot "],
+["、单笔数量 ","; single-row quantity "],
+[" KG 符合 QR"," KG matches QR"],
+["品名：","Description: "],
+["批号：","Lot: "],
+["；ERP 与实际位置另行记录差异（不影响数量匹配）。","; ERP vs physical location discrepancy recorded separately (does not affect quantity matching)."],
+["✓ 完成 / MATCH · ERP 单笔数量符合","✓ COMPLETED / MATCH · Exact ERP quantity match"],
+["⚠ 云端扫描未保存","⚠ Cloud scan not saved"],
+["。请检查网络并重新扫描，避免遗漏。"," Check your connection and rescan to avoid missing an item."],
+["云端保存失败：","Cloud save failed: "],
+["⚠ ERP 核对未通过","⚠ ERP verification failed"],
+["；本次未计入有效盘点。","; this scan has not been counted."],
+["✗ ERP 数量不符 / QUANTITY MISMATCH","✗ ERP quantity mismatch"],
+["标签 ","Label "],
+["差异 ","Difference "],
+["已完成盘点，重量不会重复计算"," already counted; weight will not be counted twice"],
+["数据资料不完整","Incomplete data"],
+["云端 ERP 报表已导入","Cloud ERP report imported"],
+["已同步到云端，可以从手机登录同一账号进行盘点。","Synced to the cloud. Sign in with the same account on your phone to start counting."],
+["云端导入失败：","Cloud import failed: "],
+["多实际储位","Multiple Actual Locations"],
+["已确认实际位置","Actual location confirmed"],
+["例如 Rack A / R01","e.g. Rack A / R01"],
+["例如 01 / Row 3","e.g. 01 / Row 3"],
+["例如 2A1, 2A1-01, 2A1-02","e.g. 2A1, 2A1-01, 2A1-02"],
+["已盘点 · 位置差异","Counted · Location Variance"],
+["严格单笔匹配","Exact Single-Label Match"],
+["完成率 ","Completion "],
+["状态筛选","Filter by status"],
+["扫描记录筛选","Filter scan history"],
+["语言","Language"],
+// V1.3.10 scan-page quick switch, manual only
+['↔ 快速切换 Racking / Row','↔ Quick Switch Racking / Row'],
+['同一个 Warehouse / Location 下换货架或排位，不需要返回 ERP 导入','Change rack and row without returning to ERP Import'],
+['尚未确认位置','Location not confirmed'],
+['位置未确认','Location not confirmed'],
+['待确认切换','Switch not confirmed'],
+['当前位置已确认','Location confirmed'],
+['Racking（手动备注）','Racking (manual note)'],
+['Row（手动备注）','Row (manual note)'],
+['✓ 确认切换 / Confirm Switch','✓ Confirm Switch'],
+['请先在 ERP 导入页面确认实际仓库和储位。','Confirm warehouse and actual location in ERP Import first.'],
+['⚠ 备注尚未确认，扫描已暂停。','⚠ Unconfirmed notes; scanning paused.'],
+['当前已确认位置：','Currently confirmed location: '],
+['✓ 当前扫描位置：','✓ Current scan location: '],
+['Racking / Row 仅作为现场备注，不参与 ERP 匹配和数量计算；切换只影响后续扫描，历史记录不变。','Racking / Row are reference only; switching affects future scans, not ERP matching, quantity calculations, or previous records.'],
+
+['手动 Racking / Manual Racking（可选）','Manual Racking (optional)'],
+['手动 Row / Manual Row（可选）','Manual Row (optional)'],
+['仅用于现场记录，不参与 ERP 仓库/储位、品名、批号和净重比对；也不影响盘点数量。','Reference only. Does not affect ERP matching or stock quantity calculations.'],
+['手动备注（不参与核对）：','Manual notes (not compared):'],
+['实际位置或 Racking / Row 备注尚未确认，请先点击确认当前盘点位置','Confirm the actual location and manual Racking / Row notes before scanning'],
+['实际位置或手动 Racking / Row 已改变，请重新确认后扫描；历史记录不变。','Actual location or manual Racking / Row changed. Reconfirm before scanning; history is unchanged.'],
+
 
 // V1.3.7 scan-page inventory metrics
 ['云端同步','Cloud Sync'],['ERP 导入','ERP Import'],['扫码盘点','Scan & Count'],['扫描记录','Scan History'],['声音设置','Sound Settings'],
@@ -194,7 +306,8 @@ function apply(){
  const root=document.body;if(!root)return;
  const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,{
   acceptNode(node){if(!node.nodeValue||!node.nodeValue.trim())return NodeFilter.FILTER_REJECT;
-   const el=node.parentElement;if(!el||el.closest('style,script,textarea,#inventoryBody,#historyBody,#mappingPreview,code'))return NodeFilter.FILTER_REJECT;
+   const el=node.parentElement;if(!el||el.closest('style,script,textarea,#mappingPreview,code'))return NodeFilter.FILTER_REJECT;
+   if(el.closest('#inventoryBody,#historyBody')&&!el.closest('td.blank'))return NodeFilter.FILTER_REJECT;
    return NodeFilter.FILTER_ACCEPT;}
  });
  let node;while((node=walker.nextNode())){
