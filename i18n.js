@@ -1,10 +1,24 @@
-/* Stock Take V1.2: bilingual UI. UI translations never modify inventory or scan data. */
+/* Stock Take V1.3.6: bilingual UI. UI translations never modify inventory or scan data. */
 (function(){
 'use strict';
 const KEY='tmc_stock_take_ui_lang_v1';
 let lang='zh';
 try{lang=localStorage.getItem(KEY)==='en'?'en':'zh';}catch(_){}
 const raw = [
+
+// V1.3.6 separated page navigation
+['云端同步','Cloud Sync'],['ERP 导入','ERP Import'],['扫码盘点','Scan & Count'],['扫描记录','Scan History'],['声音设置','Sound Settings'],
+['云端连接与账号','Cloud Connection & Account'],['电脑与手机共用盘点数据','Share stock take data across PC and phone'],
+['ERP 导入与实际位置','ERP Import & Actual Locations'],['导入报表、设置实际储位并查看盘点进度','Import ERP, confirm actual locations and review progress'],
+['扫码与 ERP 盘点比对','Scan & ERP Reconciliation'],['扫描 QR 并立即核对 ERP 数量','Scan QR labels and reconcile ERP quantities'],
+['查看标签记录与异常，必要时删除错误扫描','Review scan history and exceptions; delete incorrect scans if needed'],
+['扫码声音设置','Scan Beep Settings'],['调整扫描提示音、音效与音量','Adjust scan alert style and volume'],
+['盘点资料管理 / Inventory Data','Inventory Data Management'],['导入 ERP、导出 Excel/CSV、备份与恢复盘点资料。','Import ERP, export Excel/CSV and manage JSON backups.'],
+['已确认 ERP 和实际位置？下一步开始扫描标签。','ERP and actual location confirmed? Start scanning labels.'],
+['开始扫码 / Start Scanning','Start Scanning'],
+['声音设置只影响当前设备。手机静音或媒体音量过低时，可能听不到提示音。','Sound settings apply to this device only. Silent mode or low media volume may mute beeps.'],
+['← 返回扫码 / Back to Scan','← Back to Scan'],
+
 ['⚠ 同一料号与批号对应多个 ERP 储位 / Select ERP Row','⚠ Multiple ERP racks for the same part/lot — select a row'],
 ['QR 标签上的旧仓库、旧储位不参与比对。请核对实物对应的 ERP 库存项目；选择后只计入一次，不用重新扫码。','Old warehouse/rack on QR are only references. Confirm which ERP row this item belongs to. It will count once; no rescan needed.'],
 ['选择并计入 / Count here','Select & Count'],['取消 / Cancel','Cancel'],
