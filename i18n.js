@@ -5,6 +5,10 @@ const KEY='tmc_stock_take_ui_lang_v1';
 let lang='zh';
 try{lang=localStorage.getItem(KEY)==='en'?'en':'zh';}catch(_){}
 const raw = [
+['⚠ 同一料号与批号对应多个 ERP 储位 / Select ERP Row','⚠ Multiple ERP racks for the same part/lot — select a row'],
+['QR 标签上的旧仓库、旧储位不参与比对。请核对实物对应的 ERP 库存项目；选择后只计入一次，不用重新扫码。','Old warehouse/rack on QR are only references. Confirm which ERP row this item belongs to. It will count once; no rescan needed.'],
+['选择并计入 / Count here','Select & Count'],['取消 / Cancel','Cancel'],
+
 ['ERP × 实际位置（QR 仅供识别）','ERP × Actual Locations (QR for ID only)'],
 
 ['扫码提示音 / Beep sound','Beep sound'],['♫ 试听 / Test','♫ Test Beep'],

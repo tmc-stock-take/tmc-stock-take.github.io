@@ -102,10 +102,11 @@ async function importInventory(data){ensure();if(batch&&!confirm(t('上传新报
  const {error}=await client.from('stocktake_batches').insert({owner_id:user.id,report_name:data.reportName,imported_at:data.importedAt,inventory:data.inventory});if(error)throw error;
  await loadRemote();setStatus(t('✓ 云端 ERP 报表已上传','✓ ERP report uploaded to cloud'));return true;
 }
-async function insertScan(raw){ensure();
+async function insertScan(raw,chosenKey=null){ensure();
  // Refresh before validating, so a remote ERP re-import cannot be scanned against a stale batch.
  await loadRemote();if(!batch)throw Error(t('云端没有 ERP 报表，请先用电脑上传。','No ERP report in cloud; import on PC first.'));
- let rec=window.StockTakeCore.prepareScan(raw),currentBatchId=batch.id;
+ let rec=window.StockTakeCore.prepareScan(raw,chosenKey),currentBatchId=batch.id;
+ if(rec.requiresSelection){window.StockTakeCore.showChoice(raw,rec.candidates);return null;}
  async function insert(r){return client.from('stocktake_scans').insert({owner_id:user.id,batch_id:currentBatchId,label:r.label||'',status:r.status,payload:r})}
  let {error}=await insert(rec);
  if(error?.code==='23505'&&['accepted','counted_variance','counted_multi'].includes(rec.status)) {

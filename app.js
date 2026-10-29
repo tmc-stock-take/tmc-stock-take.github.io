@@ -1,4 +1,4 @@
-/* TMC Stock Take V1.3.1: multi-location physical stock-take + optional realtime cloud */
+/* TMC Stock Take V1.3.3: ERP multi-row resolver, multi-location scan, optional cloud */
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);
@@ -22,6 +22,7 @@ const TOLERANCE=0.001;
 let db=null, state={version:2,inventory:[],history:[],reportName:'',importedAt:'',nextId:1,activeLocation:null};
 let parsed=null, dataFile='', cameraStream=null, videoFrame=null, detector=null, lastScanText='', lastScanAt=0, scanLock=false, deferredInstall=null;
 let invFilter='all';
+let pendingERPScan=null; // UI-only pending scan; not counted or sent to cloud until a row is selected
 let loadPromise;
 function normalizeHeader(s){return String(s??'').toLowerCase().normalize('NFKC').replace(/[\s\p{P}\p{S}_]/gu,'')}
 function expandScientific(s){s=String(s??'').trim();let m=s.match(/^([+-]?)(\d+)(?:\.(\d+))?[eE]([+-]?\d+)$/);if(!m)return s;
@@ -165,7 +166,7 @@ async function confirmImport(){if(!parsed)return;
  if(!result.inventory.length){msg('未找到有效资料，请检查栏位和数量');return}
  if(window.TMCCloud?.isActive()){try{const ok=await window.TMCCloud.importInventory({inventory:result.inventory,reportName:dataFile,importedAt:now()});if(ok){parsed=null;$('mappingPanel').classList.remove('show');$('reportFile').value='';renderComparison(null);notice('云端 ERP 报表已导入','已同步到云端，可以从手机登录同一账号进行盘点。','good')}}catch(e){msg('云端导入失败：'+e.message)}return}
  if(state.inventory.length&&!withConfirm('导入新 ERP 报表会清除目前盘点记录（'+state.history.length+' 笔）。建议先导出备份。是否继续？'))return;
- state.inventory=result.inventory;state.history=[];state.reportName=dataFile;state.importedAt=now();state.nextId=1;state.activeLocation=null;parsed=null;restorePositionInputs();renderComparison(null);
+ closeERPChoice();state.inventory=result.inventory;state.history=[];state.reportName=dataFile;state.importedAt=now();state.nextId=1;state.activeLocation=null;parsed=null;restorePositionInputs();renderComparison(null);
  $('mappingPanel').classList.remove('show');$('reportFile').value='';await saveStore();render();notice('成功导入 ERP 报表',`共读取 ${result.importedLines} 行，合并后 ${result.inventory.length} 项库存。可以开始扫描标签。`,'good');
 }
 function parseScan(raw){let text=String(raw||'').trim();if(!text)throw Error('扫描内容为空');
@@ -216,20 +217,56 @@ async function confirmPhysicalPosition(){
 }
 // Printed QR warehouse and rack are historical references only.
 // Identify material by Part No. + Lot No.; never select an ERP row by the QR location.
-function erpCandidate(scan,actual){
+function erpCandidate(scan,actual,chosenKey=null){
  const candidates=state.inventory.filter(r=>r.part===scan.part&&r.lot===scan.lot);
  if(!candidates.length)return {row:null,reason:state.inventory.some(r=>r.part===scan.part)?'ERP 有此料号，但找不到相同批号 '+scan.lot:'ERP 中找不到该料号及批号',status:'unmatched'};
- const physicalMatch=candidates.filter(r=>r.warehouse===actual.warehouse&&actual.locations.includes(r.location));
- if(physicalMatch.length===1)return {row:physicalMatch[0]};
- if(physicalMatch.length>1)return {row:null,status:'ambiguous',reason:'同料号及批号在 ERP 的多个储位均出现在实际位置清单中，无法确定该标签归属：'+physicalMatch.map(r=>r.warehouse+'/'+r.location).join('、')+'。请缩小实际储位范围后重扫。'};
- if(candidates.length===1)return {row:candidates[0]};
- return {row:null,status:'ambiguous',reason:'ERP 同料号/批号存在多个库存项目，实际位置未能唯一确定：'+candidates.map(r=>r.warehouse+'/'+r.location).join('、')+'。请先核对再重扫。'};
+ // A manual selection always has priority. It is validated against the CURRENT ERP batch.
+ if(chosenKey!==null){const selected=candidates.find(r=>keyOf(r)===chosenKey);if(selected)return {row:selected,assignment:'manual'};
+   return {row:null,status:'ambiguous',candidates,reason:'选择的 ERP 库存项目已不存在。请重新核对当前报表。'};}
+ if(candidates.length===1)return {row:candidates[0],assignment:'only'};
+ const current=scannedSum();
+ // Exact uncounted balance provides a reliable hint even when printed QR rack is old.
+ // Never use the QR warehouse/rack as an identifier.
+ const weightMatches=candidates.filter(r=>Math.abs(round3(r.quantity-(current.get(keyOf(r))?.sum||0))-scan.weight)<=TOLERANCE);
+ if(weightMatches.length===1)return {row:weightMatches[0],assignment:'weight'};
+ const physical=candidates.filter(r=>r.warehouse===actual.warehouse&&actual.locations.includes(r.location));
+ if(physical.length===1)return {row:physical[0],assignment:'location'};
+ const sameWarehouse=candidates.filter(r=>r.warehouse===actual.warehouse);
+ if(physical.length===0&&sameWarehouse.length===1)return {row:sameWarehouse[0],assignment:'warehouse'};
+ const prioritized=physical.length?physical:sameWarehouse.length?sameWarehouse:candidates;
+ return {row:null,status:'ambiguous',candidates:prioritized,reason:'料号 '+scan.part+' / 批号 '+scan.lot+' 在 ERP 有 '+candidates.length+' 个库存项目；请从下方选择本张标签应计入的 ERP 仓库及储位（无需重扫）。'};
 }
+function closeERPChoice(){pendingERPScan=null;const el=$('erpChoicePanel');el.classList.add('hide');el.innerHTML='';}
+function showERPChoice(raw,candidates){
+ let scan;try{scan=parseScan(raw)}catch(e){notice('QR 资料错误',e.message,'bad');return}
+ if(!Array.isArray(candidates)||!candidates.length){notice('无法找到 ERP 候选项目','请重新导入 ERP 报表后重扫。','bad');return}
+ pendingERPScan={raw,candidates:candidates.map(r=>keyOf(r))};
+ const sums=scannedSum();
+ const rows=candidates.map((r,i)=>{
+    const counted=sums.get(keyOf(r))?.sum||0,remaining=round3(r.quantity-counted),near=Math.abs(remaining-scan.weight)<=TOLERANCE;
+    const yes=near?'<span class="choice-hint">重量与 ERP 剩余量相同 / Net KG equals remaining</span>':'';
+    return '<div class="choice-row"><div><strong>'+safe(r.warehouse)+' / '+safe(r.location)+'</strong>'+yes+'<div class="muted">'+safe(r.part)+' · '+safe(r.lot)+'<br>ERP '+displayNumber(r.quantity)+' KG · 已盘 '+displayNumber(counted)+' KG · 剩余 '+displayNumber(remaining)+' KG</div></div><button type="button" class="btn primary" data-erp-choice="'+i+'">'+safe(tr('选择并计入 / Count here'))+'</button></div>';
+ }).join('');
+ const pane=$('erpChoicePanel');pane.classList.remove('hide');
+ pane.innerHTML='<div class="choice-title">'+safe(tr('⚠ 同一料号与批号对应多个 ERP 储位 / Select ERP Row'))+'</div><div class="muted">Label '+safe(scan.label)+' · '+safe(scan.part)+' / '+safe(scan.lot)+' · QR Net '+displayNumber(scan.weight)+' KG</div><p>'+safe(tr('QR 标签上的旧仓库、旧储位不参与比对。请核对实物对应的 ERP 库存项目；选择后只计入一次，不用重新扫码。'))+'</p>'+rows+'<button type="button" class="btn" id="cancelErpChoice">'+safe(tr('取消 / Cancel'))+'</button>';
+ notice('⚠ 请选择 ERP 库存项目','这笔扫描尚未保存或计重。选择其中一笔 ERP 记录后才会完成盘点。','warn');
+ pane.scrollIntoView?.({block:'nearest',behavior:'smooth'});
+}
+async function confirmERPChoice(index){
+ if(!pendingERPScan)return;
+ const pending=pendingERPScan,chosenKey=pending.candidates[index];
+ if(!chosenKey)return;
+ closeERPChoice();
+ if(window.TMCCloud?.isActive()){
+  try{await window.TMCCloud.insertScan(pending.raw,chosenKey)}catch(e){window.StockTakeSound?.play('error');notice('⚠ 云端保存失败',e.message+'；本次未计入，请重新扫描。','bad')}
+ }else await performScan(pending.raw,chosenKey);
+}
+
 const COUNTABLE_STATUSES=new Set(['accepted','counted_variance','counted_multi']);
 const isCounted=h=>COUNTABLE_STATUSES.has(h.status);
 function countedKey(h){return keyOf({part:h.part,lot:h.lot,warehouse:h.erpWarehouse||h.warehouse,location:h.erpLocation||h.location})}
-function evaluateScan(scan,actual){
- const found=erpCandidate(scan,actual),row=found.row;
+function evaluateScan(scan,actual,chosenKey=null){
+ const found=erpCandidate(scan,actual,chosenKey),row=found.row;
  if(!row)return {...found,details:[found.reason],positionChecks:null};
  const erpWarehouseMatch=actual.warehouse===row.warehouse;
  const erpInActual=erpWarehouseMatch&&actual.locations.includes(row.location);
@@ -241,7 +278,7 @@ function evaluateScan(scan,actual){
  if(multiple)details.push('实际记录多个储位：'+locationText(actual.locations)+'；本张标签尚未指定唯一实际储位，重量只计一次');
  const status=multiple?'counted_multi':erpInActual?'accepted':'counted_variance';
  const reason=details.length?details.join('；'):'料号、批号符合 ERP，实物位置与 ERP 一致；QR 标签旧仓库/储位仅作记录';
- return {row,status,details,reason,positionChecks:{erpInActual,erpWarehouseMatch,qrInActual:null,extraLocations,actualCount:actual.locations.length}};
+ return {row,status,details,reason:found.assignment==='manual'?'人工选择 ERP 项目；'+reason:found.assignment==='weight'?'标签净重与 ERP 剩余数量唯一对应；'+reason:reason,positionChecks:{erpInActual,erpWarehouseMatch,qrInActual:null,extraLocations,actualCount:actual.locations.length}};
 }
 function renderComparison(record){
  const el=$('scanComparison');if(!record){el.classList.add('hide');el.innerHTML='';return}
@@ -261,8 +298,8 @@ function renderComparison(record){
 }
 function scannedSum(){let map=new Map();for(let h of state.history){if(!isCounted(h))continue;let k=countedKey(h);map.set(k,{sum:round3((map.get(k)?.sum||0)+h.weight),count:(map.get(k)?.count||0)+1})}return map}
 function classify(row,counted){let diff=round3(counted-row.quantity);if(counted===0)return'pending';if(Math.abs(diff)<=TOLERANCE)return'done';if(diff<0)return'short';return'over'}
-async function performScan(raw){
- if(window.TMCCloud?.isActive()){try{await window.TMCCloud.insertScan(raw)}catch(e){window.StockTakeSound?.play('error');notice('⚠ 云端扫描未保存',e.message+'。请检查网络并重新扫描，避免遗漏。','bad');msg('云端保存失败：'+e.message)}return}
+async function performScan(raw,chosenKey=null){
+ if(window.TMCCloud?.isActive()){try{await window.TMCCloud.insertScan(raw,chosenKey)}catch(e){window.StockTakeSound?.play('error');notice('⚠ 云端扫描未保存',e.message+'。请检查网络并重新扫描，避免遗漏。','bad');msg('云端保存失败：'+e.message)}return}
  if(!state.inventory.length){window.StockTakeSound?.play('error');notice('请先导入 ERP 报表','尚未读取库存清单，无法比对扫描标签。','warn');return}
  let actual;try{actual=physicalPosition()}catch(e){window.StockTakeSound?.play('error');notice('请先确认实际盘点位置',e.message,'warn');msg(e.message);return}
  let record,scan;
@@ -270,7 +307,15 @@ async function performScan(raw){
   record={id:state.nextId++,at:now(),status:'invalid',message:e.message,raw:String(raw).slice(0,500),actualWarehouse:actual.warehouse,actualLocation:actual.location,actualLocations:actual.locations};
   state.history.push(record);await saveStore();render();renderComparison(null);window.StockTakeSound?.play('error');notice('QR 资料格式错误',e.message,'bad');return;
  }
- const result=evaluateScan(scan,actual);
+ // Duplicate labels must be detected BEFORE trying to allocate between ERP locations.
+ if(state.history.some(h=>h.label===scan.label&&h.label&&isCounted(h))){
+  closeERPChoice();
+  const dup={...scan,id:state.nextId++,at:now(),status:'duplicate',message:'Label '+scan.label+' 已盘点，重量不会重复计入',actualWarehouse:actual.warehouse,actualLocation:actual.location,actualLocations:actual.locations};
+  state.history.push(dup);await saveStore();render();renderComparison(dup);window.StockTakeSound?.play('duplicate');notice('重复标签 / DUPLICATE',dup.message,'warn');return;
+ }
+ const result=evaluateScan(scan,actual,chosenKey);
+ if(result.status==='ambiguous'&&result.candidates?.length){showERPChoice(raw,result.candidates);window.StockTakeSound?.play('warning');return}
+ closeERPChoice();
  record={...scan,id:state.nextId++,at:now(),actualWarehouse:actual.warehouse,actualLocation:actual.location,actualLocations:actual.locations,positionChecks:result.positionChecks||null,
          erpWarehouse:result.row?.warehouse||'',erpLocation:result.row?.location||'',status:result.status,message:result.reason};
  if(state.history.some(h=>h.label===scan.label&&h.label&&isCounted(h))){
@@ -381,7 +426,7 @@ async function clearScans(){if(!state.history.length){msg('没有需要清空的
  state.history=[];await saveStore();render();notice('已清空扫描','ERP 库存资料保留，可以重新盘点。','warn')}
 async function clearAll(){if(!state.inventory.length&&!state.history.length){msg('目前没有盘点资料');return}if(!withConfirm('确定删除本机 ERP 报表以及所有扫描记录？建议先导出 Excel/JSON 备份。'))return;
  if(window.TMCCloud?.isActive()){if(!withConfirm('云端模式：此操作将删除当前账号的所有盘点任务及扫描记录，所有设备都会受到影响。确定永久删除？'))return;try{await window.TMCCloud.clearAll();notice('已清空云端盘点','所有设备上的云端盘点任务已删除。','warn')}catch(e){msg('清空云端失败：'+e.message)}return}
- await stopCamera();state={version:2,inventory:[],history:[],reportName:'',importedAt:'',nextId:1,activeLocation:null};await saveStore();restorePositionInputs();render();notice('盘点资料已清空','请重新导入 ERP 库存报表。','warn')}
+ await stopCamera();closeERPChoice();state={version:2,inventory:[],history:[],reportName:'',importedAt:'',nextId:1,activeLocation:null};await saveStore();restorePositionInputs();render();notice('盘点资料已清空','请重新导入 ERP 库存报表。','warn')}
 function photoError(){msg('本浏览器未提供照片 QR 识别功能。请改用 Chrome Android 相机或 2D 扫描枪。')}
 async function detectPhoto(file){if(!file)return;
  try{if(!('BarcodeDetector'in window))return photoError();const bmp=await createImageBitmap(file);let dec=new BarcodeDetector({formats:['qr_code']});let found=await dec.detect(bmp);bmp.close?.();if(!found.length)throw Error('照片内未侦测到清晰的 QR Code');await performScan(found[0].rawValue)}catch(e){msg('照片读取失败：'+e.message)}finally{$('photoInput').value=''}
@@ -389,7 +434,7 @@ async function detectPhoto(file){if(!file)return;
 async function stopCamera(){if(videoFrame)cancelAnimationFrame(videoFrame);videoFrame=null;if(cameraStream){for(const t of cameraStream.getTracks())t.stop();cameraStream=null}
  $('scannerPanel').classList.remove('active');$('cameraBtn').textContent='开启相机扫描';$('cameraVideo').srcObject=null;}
 async function scanFrames(){if(!cameraStream)return;
- try{let video=$('cameraVideo');if(video.readyState>=2&&!scanLock){let rs=await detector.detect(video);if(rs.length){let value=rs[0].rawValue,t=Date.now();if(value&&(value!==lastScanText||t-lastScanAt>12000)){
+ try{let video=$('cameraVideo');if(video.readyState>=2&&!scanLock&&!pendingERPScan){let rs=await detector.detect(video);if(rs.length){let value=rs[0].rawValue,t=Date.now();if(value&&(value!==lastScanText||t-lastScanAt>12000)){
  lastScanText=value;lastScanAt=t;scanLock=true;await performScan(value);scanLock=false;
  }}}
  }catch(e){console.warn('Camera QR detection:',e)}
@@ -419,6 +464,7 @@ function hookEvents(){addBackupButtons();$('reportFile').addEventListener('chang
  $('actualLocation').addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();$('confirmPosition').click()}});
  $('cameraBtn').addEventListener('click',()=>{window.StockTakeSound?.unlock();toggleCamera()});$('scanBtn').addEventListener('click',async()=>{window.StockTakeSound?.unlock();let s=$('scanInput').value.trim();if(s){$('scanInput').value='';await performScan(s)}else msg('请输入 QR 标签内容')});
  $('scanInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('scanBtn').click()}});
+ $('erpChoicePanel').addEventListener('click',e=>{let b=e.target.closest('[data-erp-choice]');if(b){confirmERPChoice(Number(b.dataset.erpChoice));return}if(e.target.closest('#cancelErpChoice'))closeERPChoice()});
  $('photoInput').addEventListener('change',e=>detectPhoto(e.target.files[0]));
  $('demoScanBtn').addEventListener('click',()=>performScan('NO.009998|L002|3A1-113|20260617|5899951013108|190.300'));
  $('undoBtn').addEventListener('click',undo);$('resetAll').addEventListener('click',clearAll);$('clearScans').addEventListener('click',clearScans);
@@ -449,11 +495,14 @@ window.StockTakeCore={
     state.nextId=Math.max(0,...state.history.map(h=>Number(h.id)||0))+1;
     restorePositionInputs();render();renderComparison(null);
   },
-  prepareScan:raw=>{
+  showChoice:(raw,candidates)=>showERPChoice(raw,candidates),
+  prepareScan:(raw,chosenKey=null)=>{
     if(!state.inventory.length)throw Error('云端尚未导入 ERP 报表');
     const actual=physicalPosition();let scan,record;
     try{scan=parseScan(raw)}catch(e){return {id:0,at:now(),status:'invalid',label:'',message:e.message,raw:String(raw).slice(0,500),actualWarehouse:actual.warehouse,actualLocation:actual.location,actualLocations:actual.locations}}
-    const result=evaluateScan(scan,actual);
+    const already=state.history.some(h=>h.label===scan.label&&h.label&&isCounted(h));
+    const result=already?{row:null,status:'duplicate',reason:'Label '+scan.label+' 已有盘点记录，重量不会重复计算'}:evaluateScan(scan,actual,chosenKey);
+    if(result.status==='ambiguous'&&result.candidates?.length)return {requiresSelection:true,candidates:result.candidates};
     record={...scan,id:0,at:now(),actualWarehouse:actual.warehouse,actualLocation:actual.location,actualLocations:actual.locations,positionChecks:result.positionChecks||null,erpWarehouse:result.row?.warehouse||'',erpLocation:result.row?.location||'',status:result.status,message:result.reason};
     if(state.history.some(h=>h.label===scan.label&&h.label&&isCounted(h))){
       record.status='duplicate';record.message='Label '+scan.label+' 已有盘点记录，重量不会重复计算';

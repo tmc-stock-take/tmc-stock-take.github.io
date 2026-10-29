@@ -1,8 +1,30 @@
-# TMC Warehouse Stock Take V1.3.2 — 取消 QR 位置比对 + 扫码提示音
+# TMC Warehouse Stock Take V1.3.3 — ERP 多储位匹配修正版
+
+## 核心修复：同料号、同批号、多个 ERP 储位
+
+例如同一料号 `5007803101001`、批号 `50078-2608-01` 在 ERP 两个储位 `A001 / 2A1-01` (135.200 KG) 和 `A001 / 2A1-02` (195.900 KG)。实际盘点位置又同时选择两个储位时：
+
+- 系统先按料号、批号匹配 ERP；**不会**用 QR 标签上的仓库 / 储位判断。
+- 如果某一笔 ERP 的**剩余未盘点重量**与扫描 QR 净重在 0.001 KG 内唯一相同，自动分配到该 ERP 项目；ERP 行为汇总数时，这仅表示量吻合，仍须现场核查物料。
+- 如果无法唯一分辨，显示各 ERP 记录，包含仓库、储位、ERP 数量、已盘重量、剩余重量；**扫描未保存/未计重**。选择一笔后才计入，**无需重新扫描 QR**。
+- 标签重复扫描不会再次计重。多储位、位置差异、中文/English、扫码哔声、Excel、Supabase 模式保留。
+- 一张标签的净重只计到**一笔 ERP 库存项目**。有位置差异照常记录为异常待查；不会修改 ERP 数据。
+
+### 更新方式
+
+1. 更新前备份现有盘点 JSON、Excel。云端模式请确认云端有数据库备份。
+2. 解压此包，将全部文件与 `vendor` 文件夹内容上传至 `tmc-stock-take.github.io` Repository 根目录（不是上传 ZIP 文件本身）。
+3. GitHub Actions 部署成功后，Chrome 刷新并确认页首 **V1.3.3**。若手机已安装 PWA，请关闭重新打开，不要清空网站储存。
+4. **此前 V1.3.2 的「ERP 项目无法唯一对应」未计重记录不会自动改成有效扫描**；请重新扫该张 QR，然后选择正确 ERP 行。
+5. 若 V1.3.2 的 Supabase 数据库已完成设置，本次没有新增状态或字段，无需再次执行 SQL。若尚未设置，请按压缩包中 Supabase 说明配置。
+
+> 工作提示：如果同料号和同批号在 ERP 多储位，重量一致也不能单独证明物料属哪笔 ERP；若现场不能确认，请先核查，勿随意选择。
+
+# TMC Warehouse Stock Take V1.3.3 — 取消 QR 位置比对 + 扫码提示音
 
 这是一份完整可部署到 GitHub Pages 的网页/PWA 程序，包含中文与英文、ERP Excel/CSV 导入、手机/扫码枪扫描、多个实际储位、ERP 与实际位置差异、Excel 报表，以及可选的 Supabase 电脑↔手机同步。
 
-## V1.3.2 核心规则
+## V1.3.3 核心规则
 
 1. 扫描 QR 标签，从中读取 **Label No.、Part No.、Lot No.、Net Weight (KG)** 进行物料识别和重量累计。原 QR 标签上的 **Warehouse 和 Location 完全不参与库存匹配及位置判断**，但保存在扫描历史作参考，不要求改标签。
 2. 以 **Part No. + Lot No.** 在 ERP 查找物料；如 ERP 有多笔相同料号/批号，先用实际仓库和实际位置锁定唯一 ERP 行。**如果无法唯一确认，标记 Ambiguous（待核对），不会胡乱计重**。
@@ -34,9 +56,9 @@
 ## 上传 GitHub Pages
 
 1. **升级前在旧版网页先下载 JSON 备份及 Excel**（本机模式）。不要清除 Chrome/Android 浏览器网站数据。
-2. 下载 V1.3.2 ZIP，解压后把网站文件及 `vendor` 文件夹上传覆盖到公司 Repository 根目录（`index.html` 必须在根目录）：https://github.com/tmc-stock-take/tmc-stock-take.github.io
+2. 下载 V1.3.3 ZIP，解压后把网站文件及 `vendor` 文件夹上传覆盖到公司 Repository 根目录（`index.html` 必须在根目录）：https://github.com/tmc-stock-take/tmc-stock-take.github.io
 3. GitHub → **Add file → Upload files → Commit changes**。确认 `sound.js` 同步上传。GitHub Pages 设置维持 **Deploy from a branch → main → /(root)**。
-4. 新版首次加载应出现 **V1.3.2**；手机如有旧版缓存，请关闭 App 后在 Chrome 刷新网页，或重新添加主屏幕快捷方式。勿清除网站数据。
+4. 新版首次加载应出现 **V1.3.3**；手机如有旧版缓存，请关闭 App 后在 Chrome 刷新网页，或重新添加主屏幕快捷方式。勿清除网站数据。
 
 ## Supabase 云端同步（重要：需更新 SQL）
 
@@ -52,6 +74,6 @@
 
 ## English quick guide
 
-V1.3.2 uses QR **Part No. + Lot No. + Net KG** to identify/count an item. QR warehouse/rack codes are *historical references only* and never used for matching. Count uniquely identifiable items even when ERP location differs, but add a **Location Variance** follow-up report; multiple actual rack locations are grouped without allocating/repeating weight. The new sound toggle plays a short beep for a successful scan and distinctive warning tones for duplicates or exceptions.
+V1.3.3 uses QR **Part No. + Lot No. + Net KG** to identify/count an item. QR warehouse/rack codes are *historical references only* and never used for matching. Count uniquely identifiable items even when ERP location differs, but add a **Location Variance** follow-up report; multiple actual rack locations are grouped without allocating/repeating weight. The new sound toggle plays a short beep for a successful scan and distinctive warning tones for duplicates or exceptions.
 
 For cloud mode, existing V1.3/V1.3.1 Supabase installations **must run `supabase_upgrade_v132.sql` in SQL Editor** before using new statuses. Real-device cloud synchronization requires your own Supabase credentials; only simulated cloud tests were run here.
