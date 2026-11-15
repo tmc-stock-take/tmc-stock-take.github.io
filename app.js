@@ -1,4 +1,4 @@
-/* TMC Stock Take V1.3.12: quick switch Racking / Row on scan page; reference-only. */
+/* TMC Stock Take V1.3.13: quick switch Racking / Row on scan page; reference-only. */
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);
@@ -256,7 +256,7 @@ function updatePositionUI(){
  badge.className='pill '+(confirmed?'ok':saved?'short':'wait');
  badge.textContent=confirmed?'已确认 '+wh+' / '+locs.length+' 个储位':saved?'位置待重新确认':'尚未设置';
  note.className='position-notice '+(confirmed?'active':saved?'dirty':'');
- note.textContent=confirmed?'✓ 当前盘点位置：'+positionDescription({...saved,locations:locs})+'。Racking / Row 仅记录，不参与盘点核对或计重。':saved?'⚠ 实际位置或手动 Racking / Row 已改变，请重新确认后扫描；历史记录不变。':tr('请先填写实际仓库（Actual Warehouse）及实际储位（Actual Location）；Racking / Row 为选填。完成后点击「确认当前盘点位置」。');
+ note.textContent=confirmed?tr('✓ 当前盘点位置：')+positionDescription({...saved,locations:locs})+tr('。Racking / Row 仅记录，不参与盘点核对或计重。'):saved?tr('⚠ 实际位置或手动 Racking / Row 已改变，请重新确认后扫描；历史记录不变。'):tr('请先填写实际仓库（Actual Warehouse）及实际储位（Actual Location）；Racking / Row 为选填。完成后点击「确认当前盘点位置」。');
 }
 async function confirmPhysicalPosition(){
  const wh=cleanCode($('actualWarehouse').value),manual=manualFields();

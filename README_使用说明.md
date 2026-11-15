@@ -1,3 +1,17 @@
+# V1.3.13 — Current Location 英文提示修正 / English Status Message Fix
+
+本次以 **V1.3.12** 为基础，仅修正「Actual Stock Location」已确认位置的**动态提示语**在 English 模式下仍有中文的问题；不改变任何盘点算法或数据结构。
+
+- 中文模式：`✓ 当前盘点位置：A001 / 2A1。Racking / Row 仅记录，不参与盘点核对或计重。`
+- English mode: `✓ Current location: A001 / 2A1. Racking / Row are for record-keeping purposes only and are not included in stock take verification or weight calculations.`
+- Warehouse / Location 和 Racking / Row 依据当前已确认位置动态显示；即使更换位置，句子也会正确切换中英文。
+- 更新了网页显示版本、PWA 清单及 Service Worker 缓存键（V1.3.13），避免继续显示旧提示。
+- **无需修改 Supabase SQL**；保留先前的 ERP 严格单张标签核对、Racking / Row 切换、Excel 导出、扫码音效、云端同步等功能。
+
+**更新 GitHub Pages：** 先备份 JSON/Excel；解压 ZIP，将全部文件与 `vendor/` 文件夹上传到已有的 `tmc-stock-take.github.io` Repository 根目录并覆盖，提交后确认页面显示 V1.3.13；手机如有旧缓存，可重新载入或关闭再打开，不要清除网站数据。
+
+---
+
 # V1.3.12 提示文字修正 / Prompt Translation Update
 
 本版本在 V1.3.11 基础上修正两段界面文案，盘点规则、ERP 比对、Racking / Row、Excel、云端同步不变。
