@@ -1,4 +1,4 @@
-/* TMC Stock Take V1.3.13: quick switch Racking / Row on scan page; reference-only. */
+/* TMC Stock Take V1.3.14: quick switch Racking / Row on scan page; reference-only. */
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);

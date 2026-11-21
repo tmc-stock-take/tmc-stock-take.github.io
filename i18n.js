@@ -1,11 +1,11 @@
-/* Stock Take V1.3.13: complete English UI and messages. Imported ERP values remain unchanged. */
+/* Stock Take V1.3.14: complete English UI and messages. Imported ERP values remain unchanged. */
 (function(){
 'use strict';
 const KEY='tmc_stock_take_ui_lang_v1';
 let lang='zh';
 try{lang=localStorage.getItem(KEY)==='en'?'en':'zh';}catch(_){}
 const raw = [
-// V1.3.13: exact translation for the dynamically rendered confirmed-location line
+// V1.3.14: exact translation for the dynamically rendered confirmed-location line
 ['。Racking / Row 仅记录，不参与盘点核对或计重。','. Racking / Row are for record-keeping purposes only and are not included in stock take verification or weight calculations.'],
 // V1.3.12: exact text for the position prompt; no mixed-language fragments
 ["请先填写实际仓库（Actual Warehouse）及实际储位（Actual Location）；Racking / Row 为选填。完成后点击「确认当前盘点位置」。","Enter the Actual Warehouse and Actual Location. Racking and Row are optional. Click Confirm Current Location."],
@@ -50,7 +50,7 @@ const raw = [
 ["请先导入 ERP 报表","Please import an ERP report first"],
 ["请先导入 ERP 报表，并确认实际盘点位置。","Import an ERP report and confirm the actual stock location before scanning."],
 ["暂无扫描记录","No scan records yet"],
-["TMC Stock Take V1.3.13 · 本机模式仅存设备；登录云端后 ERP 与扫描数据存入 Supabase · 请定期导出 Excel/JSON 备份","TMC Stock Take V1.3.13 · Local mode saves only to this device; in cloud mode, ERP and scan data are stored in Supabase · Export Excel/JSON backups regularly"],
+["TMC Stock Take V1.3.14 · 本机模式仅存设备；登录云端后 ERP 与扫描数据存入 Supabase · 请定期导出 Excel/JSON 备份","TMC Stock Take V1.3.14 · Local mode saves only to this device; in cloud mode, ERP and scan data are stored in Supabase · Export Excel/JSON backups regularly"],
 ["本机模式数据不会自动同步到云端；云端模式必须联网，扫描保存失败时请重新扫描。旧版位置异常记录不会自动转为已盘点，需重新扫描或核查。","Local data does not sync automatically. Cloud mode requires an internet connection; rescan failed saves. Legacy location exception records remain uncounted until rescanned or verified."],
 ["Racking (手动)","Racking (manual)"],
 ["Row (手动)","Row (manual)"],

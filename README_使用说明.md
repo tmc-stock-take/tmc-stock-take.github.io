@@ -1,3 +1,25 @@
+# V1.3.14 — 隐藏截图红框中的说明文字 / Hide Informational Help Blocks
+
+基于 V1.3.13 原有程序，仅隐藏截图红框的 8 个说明性区块（使用 CSS，不删除数据或业务代码）。
+
+- ERP 导入：QR / ERP 核对说明。
+- 实际位置：多储位输入说明、Racking / Row 备注说明、确认位置下方的绿色提示文字区块和 ERP 位置说明。
+- 扫码页面：快速切换 Racking / Row 下方的说明、QR 盘点规则说明、底部示例 QR / HTTPS 说明。
+- **保留**实际位置输入与确认按钮、扫码结果及错误警告、快速切换当前状态、扫描记录、ERP 严格单笔核对、Supabase 云端同步、Excel 导出、中英文切换及声音设置。
+- `positionNotice` 元素仍存在，供旧程序更新文字，只是在界面隐藏；如要重新显示，移除 `.v1314-hide-help` 类即可。
+
+## GitHub Pages 更新
+
+1. 建议先导出 Excel/JSON 作为备份；不要清除浏览器网站数据或 Supabase 表。
+2. 将本 ZIP 全部内容（包括 `vendor/`）上传至现有 Repository 根目录，覆盖同名文件。
+3. 本次实际改动的文件：`index.html`、`app.js`（仅版本注释）、`i18n.js`（版本字符串）、`manifest.webmanifest`（版本名称）、`sw.js`（缓存版本）、本 README。其余文件原样保留。
+4. 提交后网页版本应显示 V1.3.14；如手机仍显示旧版，重新加载页面，勿清除网站数据。
+
+## 测试范围
+静态源代码检查、JS 语法校验和元素核对可在本地完成；真实 Supabase 连接、手机相机权限及扫描操作需要在部署环境验证。
+
+---
+
 # V1.3.13 — Current Location 英文提示修正 / English Status Message Fix
 
 本次以 **V1.3.12** 为基础，仅修正「Actual Stock Location」已确认位置的**动态提示语**在 English 模式下仍有中文的问题；不改变任何盘点算法或数据结构。
