@@ -1,4 +1,4 @@
-/* TMC Stock Take V1.3.15: scanner auto-submit with Enter or after complete-input idle. */
+/* TMC Stock Take V1.3.16: immediate scanner auto-submit for complete standard labels. */
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);
@@ -609,22 +609,22 @@ function hookEvents(){addBackupButtons();$('reportFile').addEventListener('chang
  for(const id of ['quickRacking','quickRow'])$(id).addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('quickConfirmPosition').click()}});
  $('actualWarehouse').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('confirmPosition').click()}});
  $('actualLocation').addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();$('confirmPosition').click()}});
- // 2D barcode scanners commonly emulate keyboard input; some append Enter, others do not.
- // Auto-submit a COMPLETE six-field QR after 650ms without more characters.
- // A manual submit button remains available for unusual QR formats or corrections.
+ // Standard QR labels have six pipe-separated fields ending in a three-decimal KG weight.
+ // Submit synchronously on the input event that completes that format, without a delay.
+ // Nonstandard formats require scanner Enter or the manual button: no safe way to
+ // determine the final character of arbitrary keyboard-wedge input without a terminator.
  const scanInput=$('scanInput');
- let scannerIdleTimer=null, scannerSubmitting=false;
- const cancelScannerIdle=()=>{if(scannerIdleTimer!==null){clearTimeout(scannerIdleTimer);scannerIdleTimer=null}};
+ let scannerSubmitting=false;
  const completeScannerQR=value=>{
-   // Only auto-submit the standard six-field label; never send partial or generic manual text.
    const parts=String(value).trim().split('|').map(x=>x.trim());
    if(parts.length!==6||parts.some(x=>!x))return false;
+   // A partially transmitted numeric weight is also parseable; requiring the
+   // standard three decimal digits prevents premature submission.
+   if(!/^\d+\.\d{3}$/.test(parts[5]))return false;
    try{parseScan(value);return true}catch(_){return false}
  };
  const submitScannerInput=async(force=false)=>{
-   cancelScannerIdle();
    if(scannerSubmitting)return;
-   // Do not silently replace the ERP-selection panel for an unresolved scan.
    if(pendingERPScan){if(force)msg('请先选择上一笔扫描对应的 ERP 库存项目');return}
    const value=scanInput.value.trim();
    if(!value){if(force)msg('请输入 QR 标签内容');return}
@@ -633,15 +633,21 @@ function hookEvents(){addBackupButtons();$('reportFile').addEventListener('chang
    scanInput.value='';
    window.StockTakeSound?.unlock();
    try{await performScan(value)}
-   finally{scannerSubmitting=false;if(!pendingERPScan)scanInput.focus({preventScroll:true})}
+   finally{
+     scannerSubmitting=false;
+     if(!pendingERPScan){
+       scanInput.focus({preventScroll:true});
+       // A second scanner can type while the previous scan is being saved.
+       // Preserve that text and process it if it is already complete.
+       if(completeScannerQR(scanInput.value))void submitScannerInput(false);
+     }
+   }
  };
  $('cameraBtn').addEventListener('click',()=>{window.StockTakeSound?.unlock();toggleCamera()});
  $('scanBtn').addEventListener('click',()=>{void submitScannerInput(true)});
  scanInput.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();void submitScannerInput(true)}});
  scanInput.addEventListener('input',()=>{
-   cancelScannerIdle();
-   if(scannerSubmitting||pendingERPScan||!completeScannerQR(scanInput.value))return;
-   scannerIdleTimer=setTimeout(()=>{scannerIdleTimer=null;void submitScannerInput(false)},650);
+   if(!scannerSubmitting&&!pendingERPScan&&completeScannerQR(scanInput.value))void submitScannerInput(false);
  });
  $('erpChoicePanel').addEventListener('click',e=>{let b=e.target.closest('[data-erp-choice]');if(b){confirmERPChoice(Number(b.dataset.erpChoice));return}if(e.target.closest('#cancelErpChoice'))closeERPChoice()});
  $('photoInput').addEventListener('change',e=>detectPhoto(e.target.files[0]));
