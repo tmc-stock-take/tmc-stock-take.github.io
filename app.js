@@ -1,4 +1,4 @@
-/* TMC Stock Take V1.3.14: quick switch Racking / Row on scan page; reference-only. */
+/* TMC Stock Take V1.3.15: scanner auto-submit with Enter or after complete-input idle. */
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);
@@ -609,8 +609,40 @@ function hookEvents(){addBackupButtons();$('reportFile').addEventListener('chang
  for(const id of ['quickRacking','quickRow'])$(id).addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('quickConfirmPosition').click()}});
  $('actualWarehouse').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('confirmPosition').click()}});
  $('actualLocation').addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();$('confirmPosition').click()}});
- $('cameraBtn').addEventListener('click',()=>{window.StockTakeSound?.unlock();toggleCamera()});$('scanBtn').addEventListener('click',async()=>{window.StockTakeSound?.unlock();let s=$('scanInput').value.trim();if(s){$('scanInput').value='';await performScan(s)}else msg('请输入 QR 标签内容')});
- $('scanInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('scanBtn').click()}});
+ // 2D barcode scanners commonly emulate keyboard input; some append Enter, others do not.
+ // Auto-submit a COMPLETE six-field QR after 650ms without more characters.
+ // A manual submit button remains available for unusual QR formats or corrections.
+ const scanInput=$('scanInput');
+ let scannerIdleTimer=null, scannerSubmitting=false;
+ const cancelScannerIdle=()=>{if(scannerIdleTimer!==null){clearTimeout(scannerIdleTimer);scannerIdleTimer=null}};
+ const completeScannerQR=value=>{
+   // Only auto-submit the standard six-field label; never send partial or generic manual text.
+   const parts=String(value).trim().split('|').map(x=>x.trim());
+   if(parts.length!==6||parts.some(x=>!x))return false;
+   try{parseScan(value);return true}catch(_){return false}
+ };
+ const submitScannerInput=async(force=false)=>{
+   cancelScannerIdle();
+   if(scannerSubmitting)return;
+   // Do not silently replace the ERP-selection panel for an unresolved scan.
+   if(pendingERPScan){if(force)msg('请先选择上一笔扫描对应的 ERP 库存项目');return}
+   const value=scanInput.value.trim();
+   if(!value){if(force)msg('请输入 QR 标签内容');return}
+   if(!force&&!completeScannerQR(value))return;
+   scannerSubmitting=true;
+   scanInput.value='';
+   window.StockTakeSound?.unlock();
+   try{await performScan(value)}
+   finally{scannerSubmitting=false;if(!pendingERPScan)scanInput.focus({preventScroll:true})}
+ };
+ $('cameraBtn').addEventListener('click',()=>{window.StockTakeSound?.unlock();toggleCamera()});
+ $('scanBtn').addEventListener('click',()=>{void submitScannerInput(true)});
+ scanInput.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();void submitScannerInput(true)}});
+ scanInput.addEventListener('input',()=>{
+   cancelScannerIdle();
+   if(scannerSubmitting||pendingERPScan||!completeScannerQR(scanInput.value))return;
+   scannerIdleTimer=setTimeout(()=>{scannerIdleTimer=null;void submitScannerInput(false)},650);
+ });
  $('erpChoicePanel').addEventListener('click',e=>{let b=e.target.closest('[data-erp-choice]');if(b){confirmERPChoice(Number(b.dataset.erpChoice));return}if(e.target.closest('#cancelErpChoice'))closeERPChoice()});
  $('photoInput').addEventListener('change',e=>detectPhoto(e.target.files[0]));
  $('demoScanBtn').addEventListener('click',()=>performScan('NO.009998|L002|3A1-113|20260617|5899951013108|190.300'));
