@@ -1,4 +1,4 @@
-/* TMC Stock Take V1.3.18: completed ERP rows first, preserving scan and matching safeguards. */
+/* TMC Stock Take V1.3.19: English UI translations; stock take matching unchanged. */
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);
@@ -71,7 +71,7 @@ function displayNumber(n){return round3(n).toFixed(3)}
 function now(){return new Date().toLocaleString('zh-MY',{hour12:false})}
 function stamp(){const d=new Date();return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'_'+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0')}
 function msg(message){let el=$('toast');el.textContent=tr(message);el.style.display='block';clearTimeout(msg.t);msg.t=setTimeout(()=>el.style.display='none',3800)}
-function notice(title,detail,level=''){const el=$('scanStatus');el.className='statusbox '+level;el.innerHTML='<strong>'+safe(title)+'</strong>'+safe(detail)}
+function notice(title,detail,level=''){const el=$('scanStatus');el.className='statusbox '+level;el.innerHTML='<strong>'+safe(tr(title))+'</strong>'+safe(tr(detail))}
 function withConfirm(message){return window.confirm(tr(message))}
 function tr(value){return window.StockTakeI18n?.translate(value)??String(value??'')}
 async function openDb(){return new Promise(resolve=>{

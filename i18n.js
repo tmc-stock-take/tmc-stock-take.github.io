@@ -5,6 +5,34 @@ const KEY='tmc_stock_take_ui_lang_v1';
 let lang='zh';
 try{lang=localStorage.getItem(KEY)==='en'?'en':'zh';}catch(_){}
 const raw = [
+// V1.3.19: English fixes for the screenshots and dynamically generated scan messages.
+["例如 A001, B002, L002","e.g. A001, B002, L002"],
+["TMC Stock Take V1.3.19 · 本机模式仅存设备；登录云端后 ERP 与扫描数据存入 Supabase · 请定期导出 Excel/JSON 备份","TMC Stock Take V1.3.19 · Local mode stores data only on this device; after cloud sign-in, ERP and scan records are stored in Supabase · Export Excel/JSON backups regularly"],
+["上传的 ERP 报表找不到料号 ","Part No. not found in the imported ERP report: "],
+[" / 批号 "," / Lot No. "],
+["；本次未盘点。","; this scan was not counted."],
+["ERP 中有此料号，但无批号 ","This Part No. exists in ERP, but the Lot No. was not found: "],
+["ERP 数量不一致 / QUANTITY MISMATCH：QR ","ERP quantity mismatch: QR "],
+["。ERP 对应品名、批号与单笔数量：",". ERP description, lot number and single-row quantity: "],
+["。不能累计重量，也不能判定完成。",". Weights cannot be combined; this item is not complete."],
+["所选 ERP 记录的品名/批号/数量不符合标签，无法计入。","The selected ERP row does not match the label description, lot number or quantity; it cannot be counted."],
+["这笔 ERP 库存项目已经完成盘点，不可用另一张标签再次计入。","This ERP inventory row is already complete; another label cannot be counted against it."],
+["符合品名、批号和数量的 ERP 库存项目已经完成盘点。请检查是否重复扫描。","The ERP inventory row matching this description, lot number and quantity has already been counted. Check for duplicate scans."],
+[" 笔相同料号、批号与单笔数量的 ERP 记录。为避免误分配，须选择正确 ERP 仓库和储位。"," ERP rows with the same part number, lot number and individual quantity. Select the correct ERP warehouse and location to prevent misallocation."],
+["品名/批号/净重符合 ERP","Description, lot number and net weight match ERP"],
+["；本次未计入有效盘点。","; this scan has not been included in the valid stock take."],
+["；本次未计入，请重新扫描。","; this scan was not counted. Please rescan."],
+["标签 ","Label "],
+[" 已盘点，重量不会重复计入"," is already counted; its weight will not be counted again"],
+[" 已有盘点记录，重量不会重复计算"," is already counted; its weight will not be counted again"],
+["本张标签尚未计入。","This label has not been counted."],
+["无法找到对应 ERP 项目","No matching ERP inventory row found"],
+["同样品名、批号、数量出现多个 ERP 项目","Multiple ERP rows have the same description, lot number and quantity"],
+["⚠ 请选择准确的 ERP 项目","⚠ Select the correct ERP inventory row"],
+["本次尚未计入；需要人工确认同数量不同储位的 ERP 行。","Not counted yet; manually select the ERP row for the correct location."],
+["请输入实际仓库和至少一个实际储位","Enter the actual warehouse and at least one actual location"],
+[" 个 ERP 比对储位）。手动 Racking / Row 不参与数量或位置核对。"," ERP comparison locations). Manual Racking / Row do not affect quantity or location matching."],
+
 // V1.3.15: exact translation for the dynamically rendered confirmed-location line
 ['。Racking / Row 仅记录，不参与盘点核对或计重。','. Racking / Row are for record-keeping purposes only and are not included in stock take verification or weight calculations.'],
 // V1.3.12: exact text for the position prompt; no mixed-language fragments
@@ -300,6 +328,7 @@ const original = new WeakMap();
 function translate(value){
  const s=String(value??'');if(lang!=='en'||!/[\u3400-\u9fff]/.test(s))return s;
  const exact=dictionary.get(s);if(exact!==undefined)return exact;
+ if(/^有 \d+ 笔相同料号、批号与单笔数量的 ERP 记录。/.test(s))return s.replace(/^有 (\d+) 笔相同料号、批号与单笔数量的 ERP 记录。为避免误分配，须选择正确 ERP 仓库和储位。$/, 'There are $1 ERP rows with the same part number, lot number and individual quantity. Select the correct ERP warehouse and location to prevent misallocation.');
  return patterns.reduce((acc,[from,to])=>acc.includes(from)?acc.split(from).join(to):acc,s);
 }
 function apply(){

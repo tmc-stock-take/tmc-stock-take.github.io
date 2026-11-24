@@ -186,3 +186,10 @@ Excel 直接导出为单一 `.xlsx`，仍含 7 张工作表；料号文本格式
 - 扫描枪发出 Enter 时立即确认，仍支持绿色按钮手动确认。
 - 对非三位小数或其他非标准 QR 格式，不进行可能过早的自动判断，请设置扫描枪的 Enter 后缀；没有结束标记无法保证在任意内容末尾即刻判断完成。
 - 没有修改 ERP 匹配规则、扫描数据结构、Supabase、Excel 导出或数据库。
+
+
+## V1.3.19 — English language fixes
+- English mode: localized footer, multiple warehouse placeholder, ERP verification failure detail, and dynamic scan notices.
+- Chinese mode unchanged; imported ERP values are not translated.
+- Stock take validation, QR recognition, sorting, Supabase and Excel data logic unchanged.
+- No Supabase SQL changes required.
