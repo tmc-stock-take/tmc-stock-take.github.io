@@ -1,3 +1,7 @@
+# V1.3.18 — ERP Reconciliation: Complete First / 已完成优先排序
+
+ERP Inventory Reconciliation 列表现在每次渲染时将 status=done (Complete) 排在最前面，其余未完成项目排在下方；相同状态分组保留 ERP 报表的原有顺序。扫描成功及云端同步更新后自动重新排序。搜索和状态过滤逻辑不变。仅影响网页显示顺序，不修改 ERP 数据、扫描记录、云端同步及 Excel 导出。
+
 # V1.3.17 — 多个实际仓库 / Multiple Actual Warehouses
 
 - Actual Warehouse 可输入多个仓库编号，以逗号、分号或换行分隔；最多 20 个，重复值自动去重。
@@ -19,7 +23,7 @@
 - 扫完后输入框自动恢复焦点，方便下一张标签连续扫描。
 - 保持 V1.3.14 的 8 处隐藏说明、ERP 单笔数量匹配、实际位置/Racking/Row、历史记录、Supabase、Excel 导出及中英文界面不变。
 
-**GitHub Pages 更新：** 上传 ZIP 所有文件至原 Repository 根目录覆盖同名文件，包含 `vendor/` 子目录；无需运行 SQL。更新后应显示 V1.3.17。请先备份 JSON/Excel；不要清理浏览器网站数据。
+**GitHub Pages 更新：** 上传 ZIP 所有文件至原 Repository 根目录覆盖同名文件，包含 `vendor/` 子目录；无需运行 SQL。更新后应显示 V1.3.18。请先备份 JSON/Excel；不要清理浏览器网站数据。
 
 **注意：** 若你的蓝牙/USB 2D 扫描枪连接后没有把文字输入到扫描框，请先点击扫描框使之获得焦点。第一次打开扫码页也会尝试自动聚焦。存在多笔 ERP 候选时仍需人工选择，防止误计。
 

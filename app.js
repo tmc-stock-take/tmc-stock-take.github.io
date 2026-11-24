@@ -1,4 +1,4 @@
-/* TMC Stock Take V1.3.17: multiple actual warehouses with one-count-per-label safeguards. */
+/* TMC Stock Take V1.3.18: completed ERP rows first, preserving scan and matching safeguards. */
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);
@@ -454,7 +454,9 @@ function render(){const sums=scannedSum(),total=state.inventory.length,items=sta
  $('progressFill').style.width=(total?done/total*100:0)+'%';$('progressLabel').textContent=tr('完成率 ')+(total?Math.round(done/total*100):0)+'%（'+done+' / '+total+' 项）';
  $('warehouseOptions').innerHTML=[...new Set(state.inventory.map(x=>x.warehouse))].sort().map(x=>'<option value="'+safe(x)+'"></option>').join('');
  $('reportInfo').innerHTML=state.reportName?'<span><strong>'+safe(state.reportName)+'</strong><br><span class="muted">'+safe(state.importedAt)+' · '+total+tr(' 个合并库存项目')+'</span></span><span class="pill ok">'+tr('报表已导入')+'</span>':'<span class="muted">'+tr('尚未导入报表')+'</span>';
+ // Display completed ERP rows first; keep the original ERP order within each status group.
  let q=cleanCode($('searchInventory').value||'');let filtered=items.filter(r=>(invFilter==='all'||(invFilter==='issues'?r.status!=='done':r.status===invFilter))&&(!q||[r.part,r.name,r.spec,r.warehouse,r.location,r.lot].some(v=>cleanCode(v).includes(q))));
+ filtered.sort((a,b)=>Number(b.status==='done')-Number(a.status==='done'));
  $('tableSummary').textContent=filtered.length+' / '+total+' 项记录';
  $('inventoryBody').innerHTML=filtered.length?filtered.slice(0,1500).map(r=>'<tr><td>'+pill(r.status)+'</td><td>'+safe(r.part)+'</td><td class="namecol">'+safe(r.name)+'</td><td>'+safe(r.spec)+'</td><td>'+safe(r.warehouse)+'</td><td>'+safe(r.location)+'</td><td>'+safe(r.lot)+'</td><td class="num">'+displayNumber(r.quantity)+'</td><td class="num">'+displayNumber(r.scanned)+'</td><td class="num '+(r.difference<0?'amber-text':r.difference>0?'red-text':'green-text')+'">'+displayNumber(r.difference)+'</td><td>'+r.count+'</td></tr>').join(''):'<tr><td colspan="11" class="blank">'+tr(total?'目前筛选没有项目':'请先导入 ERP 报表')+'</td></tr>';
  if(filtered.length>1500)$('tableSummary').textContent+='（画面只显示前 1500 项，导出包含全部）';
