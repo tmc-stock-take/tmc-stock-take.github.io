@@ -1,0 +1,6 @@
+TMC Warehouse Stock Take V1.3.23
+- Fixed header badge previously hardcoded to V1.3.19.
+- Verified Scan History column layout: 15 headers and 15 body cells; Action contains Delete only.
+- Cache-busting local script URLs and new service-worker cache namespace.
+- No scan, ERP, database, or cloud data reset.
+- Refresh tablet after deploying and verify header V1.3.23.

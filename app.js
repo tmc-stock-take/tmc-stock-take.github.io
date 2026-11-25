@@ -1,4 +1,4 @@
-/* TMC Stock Take V1.3.19: English UI translations; stock take matching unchanged. */
+/* TMC Stock Take V1.3.23: English UI translations; stock take matching unchanged. */
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);
@@ -463,7 +463,7 @@ function render(){const sums=scannedSum(),total=state.inventory.length,items=sta
  let histFilter=$('historyFilter').value;let history=state.history.filter(h=>histFilter==='all'||(histFilter==='accepted'?isCounted(h):!isCounted(h)||h.status!=='accepted')).slice().reverse();
  const qtyChecks=historicalQuantityChecks(),historyCheckMap=new Map(state.history.map((r,i)=>[r.id,qtyChecks[i]]));
  $('historySummary').textContent=history.length+' 笔记录';
- $('historyBody').innerHTML=history.length?history.slice(0,500).map(h=>'<tr><td>'+safe(h.at)+'</td><td>'+scanQuantityPill(h,historyCheckMap.get(h.id))+'</td><td>'+safe(h.label)+'</td><td>'+safe(h.part)+'</td><td>'+safe(h.warehouse)+'</td><td>'+safe(h.location)+'</td><td>'+safe(h.actualWarehouse||'—')+'</td><td>'+safe(h.actualLocation||'—')+'</td><td>'+safe(h.manualRacking||'—')+'</td><td>'+safe(h.manualRow||'—')+'</td><td>'+safe(h.erpWarehouse||'—')+'</td><td>'+safe(h.erpLocation||'—')+'</td><td>'+safe(h.lot)+'</td><td class="num">'+(Number.isFinite(h.weight)?displayNumber(h.weight):'—')+'</td><td class="namecol">'+safe(tr(h.message))+(historyCheckMap.get(h.id)&&historyCheckMap.get(h.id).erp!==null?' · ERP '+displayNumber(historyCheckMap.get(h.id).erp)+' KG / '+tr('标签 ') + displayNumber(h.weight)+' KG / '+tr('差异 ') + displayNumber(historyCheckMap.get(h.id).diff)+' KG':'')+'</td><td><button class="btn small-btn danger" data-delete-id="'+h.id+'">'+tr('删除')+'</button></td></tr>').join(''):'<tr><td colspan="16" class="blank">'+tr('暂无扫描记录')+'</td></tr>';
+ $('historyBody').innerHTML=history.length?history.slice(0,500).map(h=>'<tr><td>'+safe(h.at)+'</td><td>'+scanQuantityPill(h,historyCheckMap.get(h.id))+'</td><td>'+safe(h.label)+'</td><td>'+safe(h.part)+'</td><td>'+safe(h.warehouse)+'</td><td>'+safe(h.location)+'</td><td>'+safe(h.actualWarehouse||'—')+'</td><td>'+safe(h.actualLocation||'—')+'</td><td>'+safe(h.manualRacking||'—')+'</td><td>'+safe(h.manualRow||'—')+'</td><td>'+safe(h.erpWarehouse||'—')+'</td><td>'+safe(h.erpLocation||'—')+'</td><td>'+safe(h.lot)+'</td><td class="num">'+(Number.isFinite(h.weight)?displayNumber(h.weight):'—')+'</td><td><button class="btn small-btn danger" data-delete-id="'+h.id+'">'+tr('删除')+'</button></td></tr>').join(''):'<tr><td colspan="15" class="blank">'+tr('暂无扫描记录')+'</td></tr>';
  if(history.length>500)$('historySummary').textContent+='（仅显示最新 500 笔，导出包含全部）';
 }
 function revokeUrl(blob,name){let url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000)}

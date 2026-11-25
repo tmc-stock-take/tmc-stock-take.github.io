@@ -188,7 +188,7 @@ Excel 直接导出为单一 `.xlsx`，仍含 7 张工作表；料号文本格式
 - 没有修改 ERP 匹配规则、扫描数据结构、Supabase、Excel 导出或数据库。
 
 
-## V1.3.21 — English language fixes
+## V1.3.23 — English language fixes
 - English mode: localized footer, multiple warehouse placeholder, ERP verification failure detail, and dynamic scan notices.
 - Chinese mode unchanged; imported ERP values are not translated.
 - Stock take validation, QR recognition, sorting, Supabase and Excel data logic unchanged.
