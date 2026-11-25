@@ -188,10 +188,15 @@ Excel 直接导出为单一 `.xlsx`，仍含 7 张工作表；料号文本格式
 - 没有修改 ERP 匹配规则、扫描数据结构、Supabase、Excel 导出或数据库。
 
 
-## V1.3.24 — English language fixes
+## V1.3.25 — English language fixes
 - English mode: localized footer, multiple warehouse placeholder, ERP verification failure detail, and dynamic scan notices.
 - Chinese mode unchanged; imported ERP values are not translated.
 - Stock take validation, QR recognition, sorting, Supabase and Excel data logic unchanged.
 - No Supabase SQL changes required.
 
-V1.3.24: Scan History adds No ERP Match and Quantity Mismatch filters; no changes to counting logic or stored data.
+V1.3.25: Scan History adds No ERP Match and Quantity Mismatch filters; no changes to counting logic or stored data.
+
+
+## V1.3.25 — Latest completed scan first
+
+ERP Inventory Reconciliation now sorts the latest successfully counted Complete row first, the previous Complete row second, followed by remaining Complete rows, then not-counted items. Original ERP order is retained among not-counted items. This is a display-only sort based on recorded scan order (including Supabase synchronization); ERP matching, weights, scan history, and exports are not changed.

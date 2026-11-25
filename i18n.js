@@ -1,4 +1,4 @@
-/* Stock Take V1.3.24: complete English UI and messages. Imported ERP values remain unchanged. */
+/* Stock Take V1.3.25: complete English UI and messages. Imported ERP values remain unchanged. */
 (function(){
 'use strict';
 const KEY='tmc_stock_take_ui_lang_v1';
@@ -7,9 +7,9 @@ try{lang=localStorage.getItem(KEY)==='en'?'en':'zh';}catch(_){}
 const raw = [
 ['ERP 无匹配','No ERP Match'],
 ['数量不符','Quantity Mismatch'],
-// V1.3.24: English fixes plus UI cleanup controls.
+// V1.3.25: English fixes plus UI cleanup controls.
 ["例如 A001, B002, L002","e.g. A001, B002, L002"],
-["TMC Stock Take V1.3.24 · 本机模式仅存设备；登录云端后 ERP 与扫描数据存入 Supabase · 请定期导出 Excel/JSON 备份","TMC Stock Take V1.3.24 · Local mode stores data only on this device; after cloud sign-in, ERP and scan records are stored in Supabase · Export Excel/JSON backups regularly"],
+["TMC Stock Take V1.3.25 · 本机模式仅存设备；登录云端后 ERP 与扫描数据存入 Supabase · 请定期导出 Excel/JSON 备份","TMC Stock Take V1.3.25 · Local mode stores data only on this device; after cloud sign-in, ERP and scan records are stored in Supabase · Export Excel/JSON backups regularly"],
 ["上传的 ERP 报表找不到料号 ","Part No. not found in the imported ERP report: "],
 [" / 批号 "," / Lot No. "],
 ["；本次未盘点。","; this scan was not counted."],
