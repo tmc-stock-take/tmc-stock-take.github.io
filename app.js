@@ -460,7 +460,16 @@ function render(){const sums=scannedSum(),total=state.inventory.length,items=sta
  $('tableSummary').textContent=filtered.length+' / '+total+' 项记录';
  $('inventoryBody').innerHTML=filtered.length?filtered.slice(0,1500).map(r=>'<tr><td>'+pill(r.status)+'</td><td>'+safe(r.part)+'</td><td class="namecol">'+safe(r.name)+'</td><td>'+safe(r.spec)+'</td><td>'+safe(r.warehouse)+'</td><td>'+safe(r.location)+'</td><td>'+safe(r.lot)+'</td><td class="num">'+displayNumber(r.quantity)+'</td><td class="num">'+displayNumber(r.scanned)+'</td><td class="num '+(r.difference<0?'amber-text':r.difference>0?'red-text':'green-text')+'">'+displayNumber(r.difference)+'</td><td>'+r.count+'</td></tr>').join(''):'<tr><td colspan="11" class="blank">'+tr(total?'目前筛选没有项目':'请先导入 ERP 报表')+'</td></tr>';
  if(filtered.length>1500)$('tableSummary').textContent+='（画面只显示前 1500 项，导出包含全部）';
- let histFilter=$('historyFilter').value;let history=state.history.filter(h=>histFilter==='all'||(histFilter==='accepted'?isCounted(h):!isCounted(h)||h.status!=='accepted')).slice().reverse();
+ let histFilter=$('historyFilter').value;
+ const isQuantityMismatch=h=>!!h.quantityMismatch||(h.status==='mismatch'&&/数量|quantity|weight|净重/i.test(h.message||''));
+ let history=state.history.filter(h=>{
+  if(histFilter==='all')return true;
+  if(histFilter==='accepted')return isCounted(h);
+  if(histFilter==='exception')return !isCounted(h)||h.status!=='accepted';
+  if(histFilter==='no_erp')return h.status==='unmatched'&&!isQuantityMismatch(h);
+  if(histFilter==='quantity_mismatch')return isQuantityMismatch(h);
+  return true;
+ }).slice().reverse();
  const qtyChecks=historicalQuantityChecks(),historyCheckMap=new Map(state.history.map((r,i)=>[r.id,qtyChecks[i]]));
  $('historySummary').textContent=history.length+' 笔记录';
  $('historyBody').innerHTML=history.length?history.slice(0,500).map(h=>'<tr><td>'+safe(h.at)+'</td><td>'+scanQuantityPill(h,historyCheckMap.get(h.id))+'</td><td>'+safe(h.label)+'</td><td>'+safe(h.part)+'</td><td>'+safe(h.warehouse)+'</td><td>'+safe(h.location)+'</td><td>'+safe(h.actualWarehouse||'—')+'</td><td>'+safe(h.actualLocation||'—')+'</td><td>'+safe(h.manualRacking||'—')+'</td><td>'+safe(h.manualRow||'—')+'</td><td>'+safe(h.erpWarehouse||'—')+'</td><td>'+safe(h.erpLocation||'—')+'</td><td>'+safe(h.lot)+'</td><td class="num">'+(Number.isFinite(h.weight)?displayNumber(h.weight):'—')+'</td><td><button class="btn small-btn danger" data-delete-id="'+h.id+'">'+tr('删除')+'</button></td></tr>').join(''):'<tr><td colspan="15" class="blank">'+tr('暂无扫描记录')+'</td></tr>';
