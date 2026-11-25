@@ -245,7 +245,7 @@ async function confirmQuickSwitch(){
  state.activeLocation={...pos,...manual};
  $('manualRacking').value=manual.manualRacking;$('manualRow').value=manual.manualRow;
  await saveStore();updatePositionUI();quickSwitchUI(true);
- notice('✓ Racking / Row 切换成功','当前 '+positionDescription({...state.activeLocation,locations:savedLocations(state.activeLocation)})+'。之后扫描使用新备注，之前记录不变。','good');
+ notice(tr('✓ Racking / Row 切换成功'),tr('当前 ')+positionDescription({...state.activeLocation,locations:savedLocations(state.activeLocation)})+tr('。之后扫描使用新备注，之前记录不变。'),'good');
  msg('已切换 Racking '+(manual.manualRacking||'—')+' / Row '+(manual.manualRow||'—'));
  $('scanInput').focus();
 }
@@ -383,7 +383,7 @@ function renderComparison(record){
  flags='<div class="position-flags"><span class="'+(erpYes?'flag-yes':'flag-no')+'">'+safe(tr('ERP 储位在实际清单中'))+': '+safe(erpYes?tr('是'):tr('否'))+'</span><span class="flag-reference">'+safe(tr('QR 仓库和储位仅供记录，不参与比对'))+'</span>'+(extras.length?'<span class="flag-no">'+safe(tr('额外实际储位'))+': '+safe(locationText(extras))+'</span>':'')+'</div>';
  }
  const manualInfo=record.manualRacking||record.manualRow?'<div class="manual-reference">'+safe(tr('手动备注（不参与核对）：'))+' Racking: <b>'+safe(record.manualRacking||'—')+'</b> · Row: <b>'+safe(record.manualRow||'—')+'</b></div>':'';
- el.innerHTML='<div class="comparison-title">'+safe(tr('ERP × 实际位置（QR 仅供识别）'))+'</div><div class="scrolltable"><table class="data-table"><thead><tr><th>'+safe(tr('比对字段'))+'</th><th>'+safe(tr('ERP 系统'))+'</th><th>'+safe(tr('QR 标签（仅参考）'))+'</th><th>'+safe(tr('实际位置'))+'</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+flags+manualInfo+'<div class="comparison-detail">'+safe(tr(record.message||''))+' · Label '+safe(record.label||'—')+' · '+safe(record.part||'—')+' / '+safe(record.lot||'—')+'</div>';
+ el.innerHTML='<div class="comparison-header"><div class="comparison-title">'+safe(tr('ERP × 实际位置（QR 仅供识别）'))+'</div><button class="btn small-btn comparison-hide-btn" id="hideComparisonBtn" type="button">'+safe(tr('隐藏'))+'</button></div><div class="scrolltable"><table class="data-table"><thead><tr><th>'+safe(tr('比对字段'))+'</th><th>'+safe(tr('ERP 系统'))+'</th><th>'+safe(tr('QR 标签（仅参考）'))+'</th><th>'+safe(tr('实际位置'))+'</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+flags+manualInfo+'<div class="comparison-detail">'+safe(tr(record.message||''))+' · Label '+safe(record.label||'—')+' · '+safe(record.part||'—')+' / '+safe(record.lot||'—')+'</div>';
  el.classList.remove('hide');
 }
 function scannedSum(){let map=new Map();for(const h of state.history){if(!isCounted(h))continue;const k=countedKey(h);if(map.has(k))continue;map.set(k,{sum:round3(h.weight),count:1})}return map}
@@ -667,6 +667,8 @@ function hookEvents(){addBackupButtons();$('reportFile').addEventListener('chang
  $('historyFilter').addEventListener('change',render);
  $('showDiscrepancy').addEventListener('click',()=>{invFilter='issues';$('statusFilter').value='all';render()});
  $('showAllRows').addEventListener('click',()=>{invFilter='all';$('statusFilter').value='all';$('searchInventory').value='';render()});
+ $('toggleRecon').addEventListener('click',()=>{const wrap=$('reconTableWrap');const hidden=!wrap.hidden;wrap.hidden=hidden;$('toggleRecon').textContent=hidden?tr('显示') : tr('隐藏')});
+ $('scanComparison').addEventListener('click',e=>{if(e.target.closest('#hideComparisonBtn'))renderComparison(null)});
  $('historyBody').addEventListener('click',e=>{let btn=e.target.closest('button[data-delete-id]');if(btn)deleteHistory(Number(btn.dataset.deleteId))});
  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e;$('installBtn').hidden=false});
  $('installBtn').addEventListener('click',async()=>{if(!deferredInstall)return;deferredInstall.prompt();await deferredInstall.userChoice;deferredInstall=null;$('installBtn').hidden=true});
