@@ -1,4 +1,4 @@
-/* Stock Take V1.3.26: complete English UI and messages. Imported ERP values remain unchanged. */
+/* Stock Take V1.3.27: complete English UI and messages. Imported ERP values remain unchanged. */
 (function(){
 'use strict';
 const KEY='tmc_stock_take_ui_lang_v1';
@@ -7,9 +7,9 @@ try{lang=localStorage.getItem(KEY)==='en'?'en':'zh';}catch(_){}
 const raw = [
 ['ERP 无匹配','No ERP Match'],
 ['数量不符','Quantity Mismatch'],
-// V1.3.26: English fixes plus UI cleanup controls.
+// V1.3.27: English fixes plus UI cleanup controls.
 ["例如 A001, B002, L002","e.g. A001, B002, L002"],
-["TMC Stock Take V1.3.26 · 本机模式仅存设备；登录云端后 ERP 与扫描数据存入 Supabase · 请定期导出 Excel/JSON 备份","TMC Stock Take V1.3.26 · Local mode stores data only on this device; after cloud sign-in, ERP and scan records are stored in Supabase · Export Excel/JSON backups regularly"],
+["TMC Stock Take V1.3.27 · 本机模式仅存设备；登录云端后 ERP 与扫描数据存入 Supabase · 请定期导出 Excel/JSON 备份","TMC Stock Take V1.3.27 · Local mode stores data only on this device; after cloud sign-in, ERP and scan records are stored in Supabase · Export Excel/JSON backups regularly"],
 ["上传的 ERP 报表找不到料号 ","Part No. not found in the imported ERP report: "],
 [" / 批号 "," / Lot No. "],
 ["；本次未盘点。","; this scan was not counted."],
@@ -278,6 +278,8 @@ const raw = [
 ['搜索料号 / 批号 / 储位 / 品名','Search Part No. / Lot No. / Location / Description'],['例如 L002','e.g. L002'],['例如 3A1-113','e.g. 3A1-113'],
 ['— 不使用此栏 —','— Do not use this column —'],['(无标题)','(Untitled)'],
 ['料件編號 / Part No.','Part No.'],['品名 / Description','Description'],['規格 / Specification','Specification'],['倉庫編號 / Warehouse','Warehouse'],['儲位 / Location','Location'],['批號 / Lot No.','Lot No.'],['庫存數量 / Stock Quantity','Stock Quantity'],['庫存單位 / Unit','Unit'],
+["— 不使用此栏 —","— Do not use this column —"],["(无标题)","(Untitled)"],["请使用 .xlsx 或 .csv 文件","Please use a .xlsx or .csv file"],["未辨识到 ERP 栏位。请检查报表标题是否包含料号、仓库、储位、批号及库存数量","ERP columns were not detected. Check that the report headers include Part No., Warehouse, Location, Lot No. and Stock Quantity."],["报表已读取，请确认栏位后导入","Report loaded. Confirm the column mapping before import."],["读取失败：","Read failed: "],["示例报表已读取，请确认导入","Sample report loaded. Confirm the import."],
+
 ['工作表：','Sheet: '],['表头第 ','Header row '],[' 行 · 共 ',' · Total '],[' 行资料',' data rows'],['预览：','Preview: '],
 ['完成率 ','Completion '],[' 项',' items'],[' 项记录',' records'],[' 笔记录',' records'],[' 个合并库存项目',' merged inventory items'],['报表已导入','Report Imported'],['目前筛选没有项目','No items match the current filter'],['（画面只显示前 1500 项，导出包含全部）',' (first 1,500 shown; export includes all)'],['（仅显示最新 500 笔，导出包含全部）',' (latest 500 shown; export includes all)'],
 // Status badges

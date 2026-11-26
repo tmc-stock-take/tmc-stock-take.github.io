@@ -157,22 +157,43 @@ function candidateSheet(s){let best={score:-1,headerIndex:0};for(let i=0;i<Math.
 function autodetect(headers,field){let aliases=ALIASES[field]||[],h=headers.map(normalizeHeader),exact=h.findIndex(x=>aliases.some(a=>x===normalizeHeader(a)));if(exact>=0)return exact;
  let partial=h.findIndex(x=>x&&aliases.some(a=>x.startsWith(normalizeHeader(a))||normalizeHeader(a).startsWith(x)&&x.length>3));return partial;
 }
+function mappingHeaderDisplay(value){
+ const raw=String(value??'').trim();
+ if(!raw)return tr('(无标题)');
+ const norm=normalizeHeader(raw);
+ const englishByField={part:'Part No.',name:'Description',spec:'Specification',warehouse:'Warehouse',location:'Location',lot:'Lot No.',quantity:'Stock Quantity',unit:'Unit'};
+ for(const [field] of FIELDS){
+  const aliases=ALIASES[field]||[];
+  if(aliases.some(a=>norm===normalizeHeader(a)))return englishByField[field]||raw;
+ }
+ return raw;
+}
+function mappingInfoText(s){
+ const rows=Math.max(0,s.rows.length-s.headerIndex-1);
+ return window.StockTakeI18n?.language==='en'
+  ? `Sheet: ${s.name} · Header row ${s.headerIndex+1} · Total ${rows} data rows`
+  : '工作表：'+s.name+' · 表头第 '+(s.headerIndex+1)+' 行 · 共 '+rows+' 行资料';
+}
+function mappingPreviewText(s){
+ const preview=s.rows.slice(s.headerIndex+1,s.headerIndex+3).map(row=>row.slice(0,11).join(' | ')).join(' / ').slice(0,260);
+ return (window.StockTakeI18n?.language==='en'?'Preview: ':'预览：')+preview;
+}
 function showMapping(){const s=parsed.current,headers=s.rows[s.headerIndex]||[],box=$('mappingFields');box.innerHTML='';
  for(let [key,title,required] of FIELDS){let wrap=document.createElement('div');wrap.className='map-row';let lab=document.createElement('label');lab.className='field-label';lab.textContent=title+(required?' *':'');let sel=document.createElement('select');sel.id='map_'+key;
- let defaultOpt=new Option('— 不使用此栏 —','');sel.add(defaultOpt);
- headers.forEach((value,i)=>sel.add(new Option(String.fromCharCode(65+Math.min(25,i))+(i>25?'+'+i:'')+' · '+(value||'(无标题)'),'c'+i)));
+ let defaultOpt=new Option(tr('— 不使用此栏 —'),'');sel.add(defaultOpt);
+ headers.forEach((value,i)=>sel.add(new Option(String.fromCharCode(65+Math.min(25,i))+(i>25?'+'+i:'')+' · '+mappingHeaderDisplay(value),'c'+i)));
  let found=autodetect(headers,key);sel.value=found<0?'':'c'+found;wrap.append(lab,sel);box.append(wrap);
  }
- $('mappingInfo').textContent='工作表：'+s.name+' · 表头第 '+(s.headerIndex+1)+' 行 · 共 '+Math.max(0,s.rows.length-s.headerIndex-1)+' 行资料';
- $('mappingPreview').textContent='预览：'+s.rows.slice(s.headerIndex+1,s.headerIndex+3).map(row=>row.slice(0,11).join(' | ')).join(' / ').slice(0,260);
+ $('mappingInfo').textContent=mappingInfoText(s);
+ $('mappingPreview').textContent=mappingPreviewText(s);
  $('mappingPanel').classList.add('show');
 }
 async function filePicked(file){if(!file)return;
- try{dataFile=file.name;let sheets;if(/\.xlsx$/i.test(file.name))sheets=await readXlsx(file);else if(/\.csv$/i.test(file.name)||/\.txt$/i.test(file.name))sheets=[{name:'CSV',rows:await readCsv(file)}];else throw Error('请使用 .xlsx 或 .csv 文件');
+ try{dataFile=file.name;let sheets;if(/\.xlsx$/i.test(file.name))sheets=await readXlsx(file);else if(/\.csv$/i.test(file.name)||/\.txt$/i.test(file.name))sheets=[{name:'CSV',rows:await readCsv(file)}];else throw Error(tr('请使用 .xlsx 或 .csv 文件'));
   let candidates=sheets.map(candidateSheet).sort((a,b)=>b.score-a.score||b.rows.length-a.rows.length);let found=candidates[0];
-  if(!found||found.score<3)throw Error('未辨识到 ERP 栏位。请检查报表标题是否包含料号、仓库、储位、批号及库存数量');
-  parsed={sheets:candidates,current:found};showMapping();msg('报表已读取，请确认栏位后导入');
- }catch(e){console.error(e);msg('读取失败：'+e.message);$('mappingPanel').classList.remove('show')}
+  if(!found||found.score<3)throw Error(tr('未辨识到 ERP 栏位。请检查报表标题是否包含料号、仓库、储位、批号及库存数量'));
+  parsed={sheets:candidates,current:found};showMapping();msg(tr('报表已读取，请确认栏位后导入'));
+ }catch(e){console.error(e);msg(tr('读取失败：')+e.message);$('mappingPanel').classList.remove('show')}
 }
 async function confirmImport(){if(!parsed)return;
  let map={};for(let [key,title,required] of FIELDS){let v=$('map_'+key).value;if(required&&!v){msg('请指定必要栏位：'+title);return}map[key]=v?Number(v.slice(1)):-1}
@@ -631,7 +652,7 @@ function addBackupButtons(){let buttons=document.querySelector('.headrow>.button
 }
 function hookEvents(){addBackupButtons();$('reportFile').addEventListener('change',e=>filePicked(e.target.files[0]));$('confirmImport').addEventListener('click',confirmImport);
  $('cancelImport').addEventListener('click',()=>{parsed=null;$('mappingPanel').classList.remove('show')});
- $('demoBtn').addEventListener('click',async()=>{dataFile='示例ERP报表.csv';parsed={current:candidateSheet({name:'Demo',rows:[['料件編號','品名','規格','倉庫編號','儲位','批號','庫存數量','庫存單位'],['5899951013108','Sweep keep Sample (-35 mesh)-Slag TRC-Mixed','Mixed','L002','3A1-113','20260617','190.300','KG']]})};showMapping();msg('示例报表已读取，请确认导入')});
+ $('demoBtn').addEventListener('click',async()=>{dataFile='Sample_ERP_Report.csv';parsed={current:candidateSheet({name:'Demo',rows:[['料件編號','品名','規格','倉庫編號','儲位','批號','庫存數量','庫存單位'],['5899951013108','Sweep keep Sample (-35 mesh)-Slag TRC-Mixed','Mixed','L002','3A1-113','20260617','190.300','KG']]})};showMapping();msg(tr('示例报表已读取，请确认导入'))});
  $('actualWarehouse').addEventListener('input',updatePositionUI);$('actualLocation').addEventListener('input',updatePositionUI);$('manualRacking').addEventListener('input',updatePositionUI);$('manualRow').addEventListener('input',updatePositionUI);
  $('confirmPosition').addEventListener('click',confirmPhysicalPosition);
  $('quickRacking').addEventListener('input',quickSwitchChanged);$('quickRow').addEventListener('input',quickSwitchChanged);
