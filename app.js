@@ -1,4 +1,4 @@
-/* TMC Stock Take V1.3.25: newest successful scans first; stock take matching unchanged. */
+/* TMC Stock Take V1.3.26: newest successful scans first; stock take matching unchanged. */
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);
